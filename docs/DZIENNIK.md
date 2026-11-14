@@ -168,3 +168,37 @@ Testy jednostkowe: odtworzenie znanej beta (0,016 i 0,012, efekt grupy), determi
 **Czego tryb `pairs` nie robi:** nie buduje par z geometrii (E2b), nie liczy lambdy z powtorzen (Q-N4-5), nie przelicza krzywizn SCI300/BDI/BCI (raport 6.3: tylko orientacyjnie) i nie wybiera rekordu TSD wg wartosci FWD.
 
 **STOP - decyzja:** brak decyzji blokujacych E3; Q-N4-3 (offset -4,8 m) dopiero przy trybie `geometry` (E2b).
+
+## 2026-11-14 — E3: N3 `tsd_network` (TSD na sieci + XML DSN)
+
+**Co zrobiono**
+- Pakiet `tsd\`: `io` (odczyt B_1510off `*.raw.sup.txt`: sekcje Headers/Parameters/Data, znak D, GPS, data z nazwy pliku, flagi pliku), `integrals` (calki P0: PCHIP zwektoryzowany po wierszach, siatka 1 mm, trapezy; wariant T), `tempcorr` (korekta d0 wykladnicza beta D0 = 1,60415 %/C, zakres T12 5-30 C; mnoznik 1,62 opcjonalnie), `filters` (jedna implementacja Hampela jak `tsd_pipeline`: MAD okna, prog > 0, okno w metrach), `window` (mediany w oknie +-5 m — mediana calek; agregacja 50/100 m), `qc` (test zyroskop-GPS z `qc_gyro_gps`), `uc_export` (XML DSN `UC`, zal. H p. 4.2, + kontrola struktury), `pipeline`, `output`, CLI `tsd_network` / `n3`, `configs\n3_example.yaml`.
+- Kolejnosc operacji (decyzje Jacka): korekta d0 do 20 C (T12 z N2/modelu; nigdy pirometr) -> Hampel na d0_20 z odrzutem calej czaszy (d0 i calki) -> mediany +-5 m -> agregacja 50/100 m -> XML. Calki P0 bez korekty temperaturowej (flaga `P0_UNCORRECTED`). Skala TSD.
+- XML `dsn_h42` (21 pol): D_0 = d0_20 (mediana), D_200 = D_0 - P0(0,20), D_300 = D_0 - P0(0,30), SCI_200 = P0(0,20), SCI_300 = P0(0,30), SCI_SUB = P0(0,90) (= D_0 - D_900); IRI_1/PROFIL_1 puste; KOD_ODDZ, ROK, DROGA, JEZDNIA, PAS, km_start wymagane w konfiguracji; uklad pliku jak `tsd_to_xml.py` (UTF-8 bez BOM, LF, puste elementy zamiast nan).
+- Flagi N3: brak/niska/wysoka T12, d0 niewazne, outlier Hampela, brak nachylenia, calki <= 0, za malo wierszy w oknie, udzial GoF < 50 %, GPS, plik nie-B_1510off / brak kanalu / podejrzana skala / rok < 2024, test zyroskop-GPS.
+
+**Co sprawdzono (150 testow zielonych + 2 `xfail` z E2; 13 nowych regresji i 21 jednostkowych N3)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| calki P0 z 9 nachylen (1308 wierszy `e2a2_slopes.csv`) vs `e2a2_autc_var.csv`: p0_a031/a061/a091/a0361/a6191 oraz t_* | zgodne | max 8e-4 um (zaokraglenie nachylen w CSV do 6 cyfr; tol. 2e-3) | OK |
+| wiersz kontrolny 1a, 2025-09-04, pkt 0: p0_a031 21,6023; a061 39,0758; a091 41,5524; a0361 17,4735; a6191 2,47669; t_a031 22,6437; t_a061 39,7148 | zgodne | <= 1e-3 | OK |
+| mediany: p0_a031 39,51; t_a031 35,69 | zgodne | <= 0,01 | OK |
+| zwektoryzowany PCHIP vs `scipy.interpolate.PchipInterpolator` (gesta siatka 1 mm) | zgodne | <= 4e-13 | OK |
+| profil liniowy a*(x-x0): P0(x1) = a*(x1^2/2 - x0*x1) | zgodne | <= 1e-6 | OK |
+| Hampel vs kopia `_hampel_col` z `tsd_pipeline` (600 punktow, outliery i NaN) | identyczna maska | 0 | OK |
+| parser `T4202008060001.raw.sup.txt`: 6103 wiersze; wiersz 1: Chainage 0, D0 -8342 (d0 8342), Slope 0.110 1453,5559, GoF 0,23790418, Lat 50,091676027, Lon 19,813605221 | zgodne | 0 | OK |
+| parser vs `b1510off_measurements` (plik 2025-04-23 nr 12, 1698 wierszy: pikietaz, d0, 9 nachylen, GoF, predkosc, temperatury) | identyczne | 0 | OK |
+| okno pary 5288 (10 wierszy B_1510off): mediana d0 153, n 8, mediana GoF 0,621656 (`e2b2_tsd_values.csv`) | 153,0; n 8; 0,621656 | <= 1e-6 | OK |
+| test zyroskop-GPS, plik 2025-04-23 nr 12 (1698 wierszy) | werdykt OK | — | OK |
+| XML dsn_h42 z prawdziwego pliku 2025 (169 rekordow co 10 m): struktura, kolejnosc 21 pol, formaty, DYSTANS krok 10, KM monotoniczne | zgodny | — | OK |
+Calki P0 z B_1510off dla `a031_w5` pary 5288 (30,43) NIE odtwarzaja `e2b2_tsd_values.csv` (28,74): tam liczono je z nachylen eksportu pgc (inny zestaw zer) — to nie blad, lecz inne zrodlo nachylen (Q-N3-14).
+
+**Decyzje implementacyjne (bez zmiany metod) i uwagi**
+- KM: eksport B_1510off nie ma markerow `Event`, `DateTime` ani IRI — KM = `km_start` + znak * pikietaz/1000 (konfiguracja); data z nazwy pliku; godzina z `GPS time` (Q-N3-15). Przesuniecie polozenia ugiec (`position_offset_m`) domyslnie 0 — konwencja znaku -4,8 m nadal nierozstrzygnieta (Q-N4-3).
+- D_300 liczone dla 0,30 m (nie 0,31 m, polozenia czujnika) — Q-N3-16. SCI_SUB = P0(0,90) wg wstepnej definicji D0 - D900 (do potwierdzenia po `UC_Schema.xsd`).
+- Struktura XML sprawdzana wzgledem zalacznika H i ukladu `tsd_to_xml.py`; walidacja XSD po dostarczeniu `UC_Schema.xsd` (w XSD zalacznika element glowny to `TSD`, w przykladzie `UC`).
+- Zrodla niezmienione (kontrola `find -newermt`; pliki B_1510off tylko do odczytu).
+
+**Co zostaje:** E4 (N2: temperatura warstwy), E2b (tryb `geometry` N4), E5 (instrukcje); do ustalenia: Q-N3-14, Q-N3-15, Q-N3-16, `UC_Schema.xsd`.
+
+**STOP — decyzja:** brak decyzji blokujacych E4.

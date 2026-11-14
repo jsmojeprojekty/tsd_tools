@@ -42,6 +42,8 @@ def main(argv=None) -> int:
         return _main_fit(args)
     if tool == "n4":
         return _main_n4(args)
+    if tool == "n3":
+        return _main_n3(args)
     if tool != "n1":
         print(f"narzedzie {args.tool} nie jest jeszcze zaimplementowane (kolejne etapy)", file=sys.stderr)
         return 1
@@ -67,6 +69,30 @@ def main(argv=None) -> int:
         if any((fr.table["flags"].to_numpy() & critical).any() for fr in result.files):
             return 2
     return 0
+
+
+def _main_n3(args) -> int:
+    from ..common.config_n3 import load_n3_config
+    from ..tsd.pipeline import run_n3
+    try:
+        cfg = load_n3_config(args.config)
+        if args.out_dir:
+            cfg.output.dir = args.out_dir
+        setup_logging(args.log_level or cfg.log_level)
+        result = run_n3(cfg, dry_run=args.dry_run)
+    except (ConfigError, FileNotFoundError, ValueError, KeyError, RuntimeError) as exc:
+        print(f"BLAD: {exc}", file=sys.stderr)
+        return 1
+    log = logging.getLogger("tsdfwd")
+    critical = 0
+    for res in result["runs"]:
+        s = res["summary"]
+        log.info("%s: %d wierszy, d0 waznych %d, odrzuconych Hampel %d, test zyroskop-GPS: %s", s["file"], s["n_rows"],
+                 s["n_valid_d0"], s["n_hampel_rejected"], s["gyro_gps_verdict"] or "-")
+        critical += int(s["n_t12_missing"] > 0)
+    for p in result["outputs"]:
+        log.info("zapisano %s", p)
+    return 2 if (args.strict and critical) else 0
 
 
 def _main_n4(args) -> int:

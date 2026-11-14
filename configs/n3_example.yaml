@@ -1,0 +1,28 @@
+# N3 tsd_network: przetwarzanie eksportu TSD B_1510off (*.raw.sup.txt) na sieci i eksport XML DSN (UC, zal. H p. 4.2).
+tool: tsd_network
+schema_version: 1
+input:
+  tsd_files: ["C:/projects/sql_tsd_fwd/baza_TSD_FWD_odcinki/TSD/B_1510off/T4202504230012.raw.sup.txt"]
+layer_temp:
+  source: constant          # w produkcji: csv z temperatura warstwy 12 cm (wynik N2): kolumny chainage_m, t12_c [, file]
+  constant_c: 15.0
+processing:
+  window_m: 5.0
+  aggregate_m: [50, 100]
+  hampel: {enabled: true, window_m: 10.0, k: 3.0}
+  correction: {range_c: [5, 30]}
+qc:
+  gps_gyro: true
+xml_uc:                     # KOD_ODDZ, ROK, DROGA, JEZDNIA, PAS i km_start sa wymagane (bez wartosci domyslnych)
+  enabled: true
+  kod_oddz: "WA"
+  rok: 2025
+  droga: "50"
+  jezdnia: 1
+  pas: 1
+  km_start: 40.0
+  km_direction: increasing
+output:
+  dir: "../wyniki/n3_example"
+  rows_csv: true
+  overwrite: true

@@ -3,7 +3,7 @@
 Pakiet `tsdfwd_tools` — narzedzia TSD/FWD dla Zakladu Diagnostyki Nawierzchni IBDiM (N1-N4), odtwarzajace metody
 raportu PW.S-1063 (Etap II). Projekt: `docs\PROJEKT.md`, inwentarz zrodel: `docs\INWENTARZ.md`, dziennik: `docs\DZIENNIK.md`.
 
-Stan: E2 — N1 `fwd_tempcorr` (korekta temperaturowa ugiec FWD, z opcjonalnym `fwd_fit`) i N4 `tsd_fwd_compare` (tryb `pairs`). N2, N3 i tryb `geometry` N4 w kolejnych etapach.
+Stan: E3 — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N4 `tsd_fwd_compare` (tryb `pairs`) i N3 `tsd_network`. N2 (temperatura warstwy) i tryb `geometry` N4 w kolejnych etapach.
 
 ## Srodowisko
 ```bash
@@ -16,6 +16,13 @@ C:\ENV\narzedzia_tsd_fwd\python.exe -m pip install -e .[dev,mdb]
 C:\ENV\narzedzia_tsd_fwd\python.exe -m tsdfwd_tools fwd_tempcorr --config configs\n1_example.yaml
 ```
 Opcje: `--dry-run` (bez zapisu), `--out-dir`, `--log-level`, `--strict` (kod 2 przy braku/niewaznej temperaturze).
+
+## Uruchomienie N3 (TSD na sieci + XML DSN)
+```bash
+C:\ENV\narzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_network --config configs\n3_example.yaml
+```
+Wejscie: eksport TSD B_1510off (`*.raw.sup.txt`) + temperatura warstwy 12 cm (CSV z N2: `chainage_m`, `t12_c`). Wyniki: okna +-5 m co 10 m
+(`*_windows_10m.csv`), agregacje 50/100 m (`*_agg_*m.csv`), opcjonalnie wiersze 1 m, plik meta i XML DSN `UC` (zal. H p. 4.2).
 
 ## Uruchomienie N4 (porownanie TSD-FWD, tryb pairs)
 ```bash
