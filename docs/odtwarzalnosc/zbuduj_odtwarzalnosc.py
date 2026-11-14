@@ -30,7 +30,7 @@ PROJEKT = ROOT / "docs" / "PROJEKT.md"
 REJESTR = Path(__file__).with_name("rejestr.yaml")
 OUT = ROOT / "docs" / "ODTWARZALNOSC.md"
 
-ROW = re.compile(r"^\| (T-N[1-4]-\d\d) \| (.*) \|\s*$")
+ROW = re.compile(r"^\| (T-(?:N[1-4]|D)-\d\d) \| (.*) \|\s*$")
 
 
 def read_spec() -> "OrderedDict[str, dict]":
@@ -156,13 +156,14 @@ def build(junit: Path) -> str:
     L.append("Kolumny: numer testu | co sprawdza | wartosc referencyjna (z raportu lub bazy zrodlowej) | tolerancja | rodzaj | liczba testow (zaliczone/pominiete/niezaliczone) | wynik. "
              "Rodzaj: `@reference` = porownanie z danymi zrodlowymi projektu (wymaga dostepu do nich); `@unit` = obliczenie analityczne lub dane syntetyczne w repozytorium.")
     L.append("")
-    cur = ""
+    cur, n_sec = "", 0
     for tid, sp, c, v in rows:
         tool = tid.split("-")[1]
         if tool != cur:
             cur = tool
+            n_sec += 1
             L.append("")
-            L.append(f"### 3.{cur[1]} {cur} - {reg['narzedzia'][cur]['nazwa']}")
+            L.append(f"### 3.{n_sec} {cur} - {reg['narzedzia'][cur]['nazwa']}")
             L.append("")
             L.append("| Test | Co sprawdza | Wartosc referencyjna | Tolerancja | Rodzaj | Przypadki: ok / xfail / pominiete / fail | Wynik |")
             L.append("|---|---|---|---|---|---|---|")

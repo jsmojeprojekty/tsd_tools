@@ -1,12 +1,15 @@
 """Wiersz polecen: python -m tsdfwd_tools <narzedzie> --config plik.yaml
 
-Narzedzia: fwd_tempcorr (n1), fwd_fit, layer_temp (n2), tsd_network (n3), tsd_fwd_compare (n4, tryby pairs i geometry)."""
+Narzedzia: fwd_tempcorr (n1), fwd_fit, layer_temp (n2), tsd_network (n3), tsd_fwd_compare (n4, tryby pairs i geometry),
+tsd_dsn (katalog przejazdow TSD -> N2 -> N3 -> XML DSN)."""
 
 from __future__ import annotations
 
 import argparse
 import logging
 import sys
+
+import pandas as pd
 
 from .. import __version__
 from ..common.config import ConfigError, load_n1_config
@@ -18,6 +21,7 @@ TOOLS = {
     "layer_temp": "n2", "n2": "n2",
     "tsd_network": "n3", "n3": "n3",
     "tsd_fwd_compare": "n4", "n4": "n4",
+    "tsd_dsn": "dsn", "dsn": "dsn",
 }
 
 
@@ -25,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="tsdfwd", description="Narzedzia TSD/FWD (IBDiM)")
     p.add_argument("--version", action="version", version=f"tsdfwd-tools {__version__}")
     p.add_argument("tool", choices=sorted(TOOLS), help="narzedzie: fwd_tempcorr (n1), layer_temp (n2), "
-                                                      "tsd_network (n3), tsd_fwd_compare (n4)")
+                                                      "tsd_network (n3), tsd_fwd_compare (n4), tsd_dsn (dsn)")
     p.add_argument("--config", required=True, help="plik konfiguracji YAML")
     p.add_argument("--out-dir", default=None, help="nadpisuje output.dir z konfiguracji")
     p.add_argument("--dry-run", action="store_true", help="przetwarza dane bez zapisu wynikow")
@@ -44,6 +48,8 @@ def main(argv=None) -> int:
         return _main_n4(args)
     if tool == "n3":
         return _main_n3(args)
+    if tool == "dsn":
+        return _main_dsn(args)
     if tool == "n2":
         return _main_n2(args)
     if tool != "n1":
@@ -118,6 +124,32 @@ def _main_n3(args) -> int:
     for p in result["outputs"]:
         log.info("zapisano %s", p)
     return 2 if (args.strict and critical) else 0
+
+
+def _main_dsn(args) -> int:
+    from ..common.config_dsn import load_dsn_config
+    from ..dsn.pipeline import run_dsn
+    try:
+        cfg = load_dsn_config(args.config)
+        if args.out_dir:
+            cfg.output.dir = args.out_dir
+        setup_logging(args.log_level or cfg.log_level)
+        result = run_dsn(cfg, dry_run=args.dry_run)
+    except (ConfigError, FileNotFoundError, ValueError, KeyError, RuntimeError) as exc:
+        print(f"BLAD: {exc}", file=sys.stderr)
+        return 1
+    log = logging.getLogger("tsdfwd")
+    tab = result["table"]
+    log.info("tsd_dsn: %d przejazdow, ok %d, z bledem %d", len(tab), result["n_ok"], result["n_error"])
+    for _, r in tab[tab["status"] == "error"].iterrows():
+        print(f"BLAD: {r['message']}", file=sys.stderr)
+    for p in result["outputs"]:
+        log.info("zapisano %s", p)
+    if result["n_error"]:
+        return 1
+    if args.strict and (tab.get("n2_valid_t12", pd.Series(dtype=float)) < tab.get("n2_samples", pd.Series(dtype=float))).any():
+        return 2
+    return 0
 
 
 def _main_n4(args) -> int:

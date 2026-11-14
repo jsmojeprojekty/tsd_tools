@@ -385,6 +385,19 @@ Uwaga: test T-N2-01 odtwarza zbior H (eksploracyjny) — to test powtarzalnosci,
 
 ---------------------------------------------------------------------------------------------------
 
+### 6.5 tsd_dsn (nakladka N2 + N3; przypadek 2: TSD -> XML DSN)
+| ID | Test | Wartosc referencyjna | Tolerancja | Zrodlo |
+|---|---|---|---|---|
+| T-D-01 | Tabela przejazdow: typy, kolumny opcjonalne, przecinek dziesietny, bledy (brak kolumn, duplikat, puste pola, zla liczba) | wg opisu | dokladnie | @unit |
+| T-D-02 | Probki temperatury z pliku TSD: odstep, konce przejazdu, mediana okna, UTC -> lokalny (czas letni +2 h, zimowy +1 h), przejscie przez polnoc, brak daty / GPS time | 10:16:40 UTC 23.04.2025 = 12:16:40 lokalnie | dokladnie | @unit |
+| T-D-03 | Przejazdy .txt i arkusz .xlsx z katalogu -> N2 (cache, bez sieci) -> N3 -> XML w skali FWD; przelicznik w meta; KM z `km_start` | D_0 = 1,6 x d0_20 (skala FWD), 4 probki temperatury na przejazd | dokladnie | @unit |
+| T-D-04 | Przejazd z bledem (eksport nominalny, brak wpisu w tabeli, brak meteo) nie przerywa pozostalych; kod wyjscia 1; ochrona przed nadpisaniem; `--dry-run` nic nie zapisuje | wg opisu | dokladnie | @unit |
+
+### 6.6 Zalozenia tsd_dsn do potwierdzenia (Jacek)
+- **Q-D-1 Czas z `GPS time`.** Zakladamy UTC (odbiornik GPS); N2 wymaga czasu lokalnego, wiec narzedzie zamienia UTC na Europe/Warsaw (`temperature.gps_time_basis: local` wylacza zamiane). Pole `GODZ` w XML (N3) nadal podaje czas z pliku bez zamiany. Potwierdzenie na pierwszym pliku B_1510off z sieci.
+- **Q-D-2 Probki temperatury.** Pirometr jest odczytem co 1 m, a N2 liczy dla pojedynczych obserwacji; narzedzie bierze probki co `sample_m` (100 m) z mediana pirometru w oknie +-`window_m` (5 m) i interpoluje temperature warstwy po pikietazie. To wybor wykonawczy (bez zmiany metod N2); do potwierdzenia / korekty odstepu.
+- **Q-D-3 Pirometr TSD.** Jak w Z15 (T12 dla TSD): te same parametry modelu co dla FWD; pirometr TSD nie byl walidowany na sieci (zastrzezenie z E0).
+
 ## 7. Plan etapow i punkty kontrolne
 
 | Etap | Zawartosc | Kryterium zamkniecia | Commit |

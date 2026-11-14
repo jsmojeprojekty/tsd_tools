@@ -4,10 +4,10 @@ Dokument jest **generowany** (`docs/odtwarzalnosc/zbuduj_odtwarzalnosc.py`) z ko
 
 ## 1. Wersja i srodowisko
 
-- pakiet `tsdfwd_tools` 0.1.0; commit kodu (HEAD w chwili generowania): `dd96a4e8078e` (drzewo robocze czyste)
+- pakiet `tsdfwd_tools` 0.1.0; commit kodu (HEAD w chwili generowania): `bf52834b9cd3` (drzewo robocze zawiera niezatwierdzone zmiany w kodzie)
 - data wygenerowania: 2026-11-14; Python 3.11.18 (Windows); numpy 2.4.6, scipy 1.17.1, pandas 3.1.1, pyyaml 6.0.3, openpyxl 3.1.5
 - testy z danymi referencyjnymi poza repozytorium (@reference): wykonane (dostepne dane zrodlowe, tylko odczyt)
-- wynik calego przebiegu: 264 testow: 262 zaliczonych, 0 niezaliczonych, 2 oczekiwanych niepowodzen (znana rozbieznosc), 0 pominietych
+- wynik calego przebiegu: 287 testow: 285 zaliczonych, 0 niezaliczonych, 2 oczekiwanych niepowodzen (znana rozbieznosc), 0 pominietych
 
 ## 2. Narzedzia i punkty raportu
 
@@ -17,6 +17,7 @@ Dokument jest **generowany** (`docs/odtwarzalnosc/zbuduj_odtwarzalnosc.py`) z ko
 | N2 | `layer_temp` | model fizyczny TN (p. 7 - niepewnosc) |
 | N3 | `tsd_network` | p. 6.1-6.2, 7.3; zal. H p. 4.2 (XML) |
 | N4 | `tsd_fwd_compare` | p. 6.2-6.3, 7.3; p. 3 i 3a (tryby); Tab. 3.2 (odcinki) |
+| D | `tsd_dsn` | nakladka N2 + N3 (bez nowych metod); - |
 
 ## 3. Macierz odtwarzalnosci
 
@@ -90,6 +91,15 @@ Kolumny: numer testu | co sprawdza | wartosc referencyjna (z raportu lub bazy zr
 | T-N4-17 | Wyrownanie przejsc profilem (7 korytarzy, 100 przejsc) vs `tsd_passes`, `tsd_sref` | zrodlo wyrownania, liczba blokow, centrowanie, `s_ref` | `s_ref` 5 mm; centrowanie 1e-4 | @reference | 7 / 0 / 0 / 0 | **zgodny** |
 | T-N4-18 | Os od zera z 239 plikow TSD ze scalaniem duplikatow pasa vs baza produktow | 165 korytarzy, 43 scalenia, 6 956 291 wierszy, 25 219 punktow wide | dlugosci 1e-3; `s_ref_gps` 1e-3 | @reference | 1 / 0 / 0 / 0 | **zgodny** |
 
+### 3.5 D - tsd_dsn
+
+| Test | Co sprawdza | Wartosc referencyjna | Tolerancja | Rodzaj | Przypadki: ok / xfail / pominiete / fail | Wynik |
+|---|---|---|---|---|---|---|
+| T-D-01 | Tabela przejazdow: typy, kolumny opcjonalne, przecinek dziesietny, bledy (brak kolumn, duplikat, puste pola, zla liczba) | wg opisu | dokladnie | @unit | 8 / 0 / 0 / 0 | **zgodny** |
+| T-D-02 | Probki temperatury z pliku TSD: odstep, konce przejazdu, mediana okna, UTC -> lokalny (czas letni +2 h, zimowy +1 h), przejscie przez polnoc, brak daty / GPS time | 10:16:40 UTC 23.04.2025 = 12:16:40 lokalnie | dokladnie | @unit | 3 / 0 / 0 / 0 | **zgodny** |
+| T-D-03 | Przejazdy .txt i arkusz .xlsx z katalogu -> N2 (cache, bez sieci) -> N3 -> XML w skali FWD; przelicznik w meta; KM z `km_start` | D_0 = 1,6 x d0_20 (skala FWD), 4 probki temperatury na przejazd | dokladnie | @unit | 1 / 0 / 0 / 0 | **zgodny** |
+| T-D-04 | Przejazd z bledem (eksport nominalny, brak wpisu w tabeli, brak meteo) nie przerywa pozostalych; kod wyjscia 1; ochrona przed nadpisaniem; `--dry-run` nic nie zapisuje | wg opisu | dokladnie | @unit | 3 / 0 / 0 / 0 | **zgodny** |
+
 ## 4. Rozbieznosci wzgledem zrodel (wyjasnione)
 
 | Oznaczenie | Opis | Test |
@@ -106,6 +116,7 @@ Powyzsze rozbieznosci sa jedynymi znanymi; szczegoly decyzji sa w `docs/DZIENNIK
 - T-N2-01 odtwarza zbior eksploracyjny H v2 (powtarzalnosc obliczen), nie jest deklaracja dokladnosci produktu; dokladnosc na zbiorze niezaleznym C v2: RMSE 2,73 C [2,44; 2,98].
 - Plik XML (N3) jest sprawdzany wewnetrznie wzgledem opisu z zalacznika H p. 4.2; walidacja wzgledem UC_Schema.xsd zostanie dodana po dostarczeniu schematu.
 - Dane pomiarowe nie sa czescia repozytorium; testy @reference czytaja je w trybie tylko do odczytu ze sciezek podanych w tests/local_paths.yaml i bez tych danych sa pomijane.
+- tsd_dsn: czas z kolumny GPS time zakladany jako UTC (Q-D-1), odstep probek temperatury 100 m (Q-D-2); bez prawdziwego przejazdu B_1510off z sieci narzedzie jest sprawdzone na danych syntetycznych.
 - Alignment profilem i os korytarzy zalezy od zestawu przejsc podanych na wejsciu (referencja = najdluzsze przejscie; budowa zachlanna).
 
 ## 6. Testy uzupelniajace (bez numeru T)
@@ -118,7 +129,7 @@ Konfiguracja, wejscie/wyjscie, CLI i przypadki brzegowe, ktore nie odpowiadaja l
 | test_fit | 10 | 0 | 0 |
 | test_fwd_pipeline_units | 2 | 0 | 0 |
 | test_n2_units | 5 | 0 | 0 |
-| test_n3_units | 3 | 0 | 0 |
+| test_n3_units | 11 | 0 | 0 |
 | test_rules_and_coefficients | 1 | 0 | 0 |
 
 ## 7. Jak odtworzyc

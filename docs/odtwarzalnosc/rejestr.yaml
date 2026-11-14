@@ -7,6 +7,7 @@ narzedzia:
   N2: {nazwa: "layer_temp", punkt_raportu: "model fizyczny TN (p. 7 - niepewnosc)"}
   N3: {nazwa: "tsd_network", punkt_raportu: "p. 6.1-6.2, 7.3; zal. H p. 4.2 (XML)"}
   N4: {nazwa: "tsd_fwd_compare", punkt_raportu: "p. 6.2-6.3, 7.3; p. 3 i 3a (tryby); Tab. 3.2 (odcinki)"}
+  D: {nazwa: "tsd_dsn", punkt_raportu: "nakladka N2 + N3 (bez nowych metod); -"}
 
 testy:
   T-N1-01: [test_rules_and_coefficients::test_e2a3_full_coefficients, test_rules_and_coefficients::test_e2a3_full_meta_and_indices_in_file, test_rules_and_coefficients::test_tab71_is_rounded_set, test_n1_reference::test_packaged_coefficients_identical_to_source, test_n1_reference::test_prompt_reference_coefficients]
@@ -60,6 +61,11 @@ testy:
   T-N4-17: [test_n4_geometry_reference::test_profile_alignment_reproduces_tsd_sref]
   T-N4-18: [test_n4_geometry_reference::test_axis_with_lane_merging_reproduces_whole_reference_network]
 
+  T-D-01: [test_dsn::test_read_trips_*, test_dsn::test_dsn_config_validation, test_dsn::test_find_files_patterns_and_duplicates]
+  T-D-02: [test_dsn::test_survey_*]
+  T-D-03: [test_dsn::test_dsn_end_to_end_two_trips_txt_and_xlsx]
+  T-D-04: [test_dsn::test_dsn_one_bad_trip_does_not_stop_the_rest, test_dsn::test_dsn_without_meteo_gives_error_row_not_crash, test_dsn::test_dsn_overwrite_protection]
+
 # Rozbieznosci i ograniczenia, ktore czytelnik raportu powinien znac (zapis z DZIENNIK.md / PROJEKT.md)
 roznice:
   - {id: "S-N4-4", opis: "Okno W5 liczone po s_ref, a nie po zakresie tsd_id: 7 z 2895 wartosci d0 par (korytarze 0..80) roznych od tabeli Z15; roznica wynika z definicji okna.", test: "T-N4-16"}
@@ -71,4 +77,5 @@ ograniczenia:
   - "T-N2-01 odtwarza zbior eksploracyjny H v2 (powtarzalnosc obliczen), nie jest deklaracja dokladnosci produktu; dokladnosc na zbiorze niezaleznym C v2: RMSE 2,73 C [2,44; 2,98]."
   - "Plik XML (N3) jest sprawdzany wewnetrznie wzgledem opisu z zalacznika H p. 4.2; walidacja wzgledem UC_Schema.xsd zostanie dodana po dostarczeniu schematu."
   - "Dane pomiarowe nie sa czescia repozytorium; testy @reference czytaja je w trybie tylko do odczytu ze sciezek podanych w tests/local_paths.yaml i bez tych danych sa pomijane."
+  - "tsd_dsn: czas z kolumny GPS time zakladany jako UTC (Q-D-1), odstep probek temperatury 100 m (Q-D-2); bez prawdziwego przejazdu B_1510off z sieci narzedzie jest sprawdzone na danych syntetycznych."
   - "Alignment profilem i os korytarzy zalezy od zestawu przejsc podanych na wejsciu (referencja = najdluzsze przejscie; budowa zachlanna)."

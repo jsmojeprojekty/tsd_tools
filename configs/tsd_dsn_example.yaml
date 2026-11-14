@@ -1,0 +1,20 @@
+# tsd_dsn: katalog przejazdow TSD (B_1510off) -> temperatura warstwy 12 cm (N2) -> N3 -> XML DSN w skali FWD.
+# Uruchomienie: python -m tsdfwd_tools tsd_dsn --config configs\tsd_dsn_example.yaml   (--dry-run: tylko sprawdzenie wejsc)
+tool: tsd_dsn
+schema_version: 1
+input:
+  tsd_dir: "../dane_siec/b1510off"         # eksporty B_1510off: *.raw.sup.txt / .xls / .xlsx (eksport nominalny jest odrzucany)
+  trips_csv: "przejazdy_przyklad.csv"      # dane odcinka per przejazd; WARTOSCI W PRZYKLADZIE SA FALSZYWE (TEST), wpisz prawdziwe
+temperature:
+  sample_m: 100.0                          # probki pirometru co 100 m; N3 interpoluje temperature wzdluz pikietazu
+  window_m: 5.0                            # mediana pirometru w oknie +-5 m
+  gps_time_basis: utc                      # 'GPS time' w UTC (do potwierdzenia); N2 pracuje na czasie lokalnym
+  meteo_cache_dir: "../wyniki/meteo_cache" # Open-Meteo: pierwsze uruchomienie pobiera dane (jedyne polaczenie sieciowe), potem cache
+  meteo_offline: false
+fwd_scale:                                 # przelicznik TSD->FWD z N4 dla okresu kalibracji; zmienia sie po kalibracji, brak wartosci domyslnej
+  to_fwd_multiplier: 1.6158                # PRZYKLAD (N4 na danych raportu); albo: to_fwd_conversion_csv: "../wyniki/n4/conversion.csv"
+qc:
+  gps_gyro: true
+output:
+  dir: "../wyniki/tsd_dsn"
+  overwrite: false

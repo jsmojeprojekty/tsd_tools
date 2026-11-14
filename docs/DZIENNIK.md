@@ -446,3 +446,18 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 | Przelicznik z `conversion.csv` N4: wartosc, przedzial, zrodlo w meta; odmowa dla funkcji nieproporcjonalnej, obcego pliku, braku pliku | zgodne | — | OK |
 | Konfiguracja: skala FWD bez przelicznika, oba zrodla naraz, przelicznik <= 0 -> blad | zgodne | — | OK |
 | Testy jednostkowe (207) i N3 z regresja (35) | wszystkie zaliczone | — | OK |
+
+## 2026-11-14 — tsd_dsn: tryb wsadowy przejazdy TSD -> N2 -> N3 -> XML DSN (przypadek 2)
+
+- Nowe narzedzie `tsd_dsn` (alias `dsn`): katalog przejazdow B_1510off (`.txt`, `.xls`, `.xlsx`) + tabela przejazdow (`plik, kod_oddz, rok, droga, jezdnia, pas, km_start`, bez wartosci domyslnych) + przelicznik TSD→FWD (liczba albo `conversion.csv` z N4) -> dla kazdego przejazdu probki pirometru z pliku, N2, N3, `UC_<przejazd>.xml` w skali FWD. Nakladka na N2 i N3, bez nowych metod obliczen; przejazd z bledem (np. eksport nominalny, brak wpisu w tabeli, brak meteo) nie przerywa pozostalych (`batch_summary.csv`, kod wyjscia 1).
+- Zalozenia wykonawcze do potwierdzenia (PROJEKT 6.6): Q-D-1 czas `GPS time` = UTC, zamieniany na lokalny dla N2; Q-D-2 probki temperatury co 100 m, mediana pirometru w oknie ±5 m, interpolacja po pikietazie; Q-D-3 pirometr TSD jak w Z15 (te same parametry modelu, bez walidacji na sieci).
+- Sprawdzenie na prawdziwym pliku z sieci (`T4202608130006.raw.sup.xls`, tylko odczyt): narzedzie odrzuca go jako eksport nominalny (tak ma byc), a probki temperatury z niego wychodza poprawne (11 probek, 13.08.2026 05:09-05:10 czasu lokalnego z 03:09 UTC, pirometr 13,6-14,9 C, powietrze 17,7-18,4 C). Wartosci tabeli przejazdow w `configs/przejazdy_przyklad.csv` sa fikcyjne (`TEST`).
+- Zalacznik Odtwarzalnosc odswiezony i rozszerzony o grupe T-D-01..04; generator obsluguje teraz prefiks T-D.
+
+| Wzorzec | Uzyskano | Roznica | Status |
+|---|---|---|---|
+| T-D-01 tabela przejazdow (typy, opcjonalne kolumny, bledy) | 8 przypadkow zaliczonych | — | OK |
+| T-D-02 probki: odstep, konce, UTC→lokalny (+2 h latem, +1 h zima), polnoc, brak daty/GPS | zgodne (10:16:40 UTC → 12:16:40 lokalnie) | — | OK |
+| T-D-03 .txt i .xlsx → N2 (cache) → N3 → XML w skali FWD, przelicznik w meta | zgodne; D_0 = 1,6·d0_20, KM z km_start | — | OK |
+| T-D-04 przejazd z bledem nie przerywa reszty, nadpisywanie, --dry-run | zgodne | — | OK |
+| Pelny przebieg testow | 287 przypadkow: 285 zaliczonych, 2 xfail (Q-N4-1), 0 niezaliczonych, 0 pominietych | — | OK |

@@ -7,7 +7,8 @@ Stan: E2f — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N2 `layer_temp`, N3 `
 
 ## Instrukcje dla inzynierow
 `docs\INSTRUKCJA_N1.md` (korekta temperaturowa FWD), `docs\INSTRUKCJA_N2.md` (temperatura warstwy), `docs\INSTRUKCJA_N3.md` (TSD na sieci + XML DSN),
-`docs\INSTRUKCJA_N4.md` (porownanie TSD-FWD). Kazda opisuje dane wejsciowe, uruchomienie, wyniki, flagi i ograniczenia.
+`docs\INSTRUKCJA_N4.md` (porownanie TSD-FWD), `docs\INSTRUKCJA_TSD_DSN.md` (katalog przejazdow TSD -> XML DSN w skali FWD).
+Kazda opisuje dane wejsciowe, uruchomienie, wyniki, flagi i ograniczenia.
 
 ## Odtwarzalnosc wzgledem raportu
 `docs\ODTWARZALNOSC.md` — zalacznik generowany z przebiegu testow: dla kazdego numeru testu (T-N1-01 ... T-N4-18) wartosc referencyjna z raportu
