@@ -53,12 +53,24 @@ arzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs
    C (sigma_long <= 5 m), X (reszta). Do porownania wchodza warstwy z `geometry.layers` (domyslnie A i B).
 4. Tworzy pary zerowe (to samo FWD, wiersze TSD z tego samego przejazdu ±200 m dalej i losowe >= 300 m dalej; seed 20261017) do kontroli zerowej.
 
-**Dodatkowe wyniki**: `geometry_pairs.csv` (wszyscy kandydaci z warstwami i oknami), `fwd_plate_positions.csv` (polozenie plyty i `sigma_long` dla stacji),
+5. Wykrywa odcinki wspolne TSD-FWD wg kryteriow Tab. 3.2 (`geometry.sections`): para (sesja FWD, przejazd TSD) jest odcinkiem, gdy ten sam rok
+   (odstep <= 400 dni), >= 5 stacji FWD w promieniu 8 m od najblizszego punktu TSD, pokrycie >= 30 % (wzgledem stacji lezacych w obwiedni TSD),
+   zakres pikietazu >= 500 m, |Spearman(station_m, pikietaz)| >= 0,80 (**monotonicznosc polozenia stacji, nie korelacja ugiec**), kierunek wg kursow
+   (roznica <= 30 st. = ten sam, >= 150 st. = przeciwny, reszta odrzucona) oraz klasa pasa wg mediany odleglosci poprzecznej (<= 0,75 m ten sam,
+   <= 2,0 m sasiedni, wiecej: inny). Pary dostaja kolumny `in_section`, `section_id`, `section_lane`, `section_direction`, `section_status`.
+   Domyslnie odcinki nie filtruja par; `geometry.sections.require_section: true` zostawia tylko pary z odcinka (bez odrzuconych w przegladzie).
+6. Raport przegladu `section_review.html` (reczna kontrola „linia do linii”): dla kazdego odcinka slad GPS (TSD i stacje FWD), wykres
+   station_m - pikietaz z regresja oraz d0 TSD (gesta linia) i D0 FWD (punkty) na wspolnym pikietazie. Decyzje zapisz w pliku CSV
+   (`session_id`, `run_id`, `status`: confirmed / rejected) i podaj w `geometry.sections.review_csv`. Raport pokazuje do 300 odcinkow
+   (`report_max_sections`); pelna tabela: `sections.csv`.
+
+**Dodatkowe wyniki**: `sections.csv` (odcinki z miarami i statusem przegladu), `section_review.html`, `geometry_pairs.csv` (wszyscy kandydaci z warstwami i oknami), `fwd_plate_positions.csv` (polozenie plyty i `sigma_long` dla stacji),
 `tsd_passes.csv`, `corridors.csv`, `geometry_null_pairs.csv`, `fwd_sessions.csv` (kierunek i jednostka dystansomierza na sesje),
 `fwd_session_runs.csv` (ciagi stacji i dopasowanie dystansomierza). W `meta.json` sekcja `geometry` zawiera uzyte reguly anteny i `sigma_era`.
 
 **Czego ten tryb nie robi (jeszcze)**
-- Nie wykrywa odcinkow wspolnych wg Tab. 3.2 ani nie robi raportu „linia do linii”; pary wynikaja z wspolnego korytarza i roku, nie z odcinkow.
+- Pary wynikaja z wspolnego korytarza i roku, nie z odcinkow; odcinki sa kontrola (kolumny `in_section`, opcjonalny filtr) i podstawa przegladu recznego.
+  Odcinki liczone sa na surowym GPS (antena FWD i GPS wiersza TSD, bez przesuniecia plyty ani lagu), jak w zrodle.
 - `s_ref` pochodzi z GPS (bez wyrownania profilem, bez scalania duplikatow pasa). Os z przejazdow TSD zalezy od zestawu przejazdow — ta sama droga
   z innym zestawem plikow moze dac troche inne `s_ref`; dla powtarzalnosci podaj gotowa os w `geometry.corridors_csv`.
 - Przejazdy z wieloma pasami jednej jezdni wymagaja czytelnych przejazdow w obu pasach (korytarze rozdzielane sa przy rozstawie > 1,75 m

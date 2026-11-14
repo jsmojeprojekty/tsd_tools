@@ -130,3 +130,30 @@ def test_geometry_missing_date_is_an_error(tmp_path):
     from tsdfwd_tools.compare.pipeline import run_n4
     with pytest.raises(ConfigError, match="brak daty"):
         run_n4(load_n4_config(_cfg(tmp_path, [new], st_path)), dry_run=True)
+
+
+def test_geometry_sections_detected_reported_and_used_as_filter(tmp_path):
+    from tsdfwd_tools.common.config_n4 import load_n4_config
+    from tsdfwd_tools.compare.pipeline import run_n4
+    paths, st_path = _write_inputs(tmp_path)
+    assert main(["tsd_fwd_compare", "--config", str(_cfg(tmp_path, paths, st_path))]) == 0
+    out = tmp_path / "out"
+    sec = pd.read_csv(out / "sections.csv")
+    assert len(sec) == 6 and (sec["lane_class"] == "same").all() and (sec["review_status"] == "unreviewed").all()
+    html = (out / "section_review.html").read_text(encoding="utf-8")
+    assert html.count("<svg") == 18 and "odcinek 6" in html
+    gp = pd.read_csv(out / "geometry_pairs.csv")
+    assert (gp["in_section"] == 1).all() and gp["section_id"].notna().all()
+    meta = json.loads((out / "meta.json").read_text(encoding="utf-8"))
+    assert meta["geometry"]["sections"]["n_sections"] == 6 and meta["geometry"]["sections"]["pairs_in_section"] == 60
+
+    # decyzje przegladu: odrzucenie jednej sesji + require_section -> jej pary znikaja z porownania
+    review = tmp_path / "review.csv"
+    pd.DataFrame([dict(session_id=3, run_id="T4202507200001", status="rejected")]).to_csv(review, index=False)
+    cfg = _cfg(tmp_path, paths, st_path, geometry={"sections": {"review_csv": str(review), "require_section": True}})
+    res = run_n4(load_n4_config(cfg), dry_run=True)
+    assert res["meta"]["geometry"]["n_pairs"] == 50 and 3 not in set(res["pairs"]["session"])
+    assert set(res["geo_sections"]["review_status"]) == {"unreviewed", "rejected"}
+    cfg_off = _cfg(tmp_path, paths, st_path, geometry={"sections": {"enabled": False}})
+    res_off = run_n4(load_n4_config(cfg_off), dry_run=True)
+    assert res_off["meta"]["geometry"]["n_pairs"] == 60 and "in_section" not in res_off["geo_pairs"]

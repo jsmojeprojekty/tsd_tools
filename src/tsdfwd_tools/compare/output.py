@@ -17,7 +17,7 @@ TABLES = (("agreement", "agreement.csv"), ("groups", "agreement_groups.csv"), ("
           # tryb geometry: tabele posrednie (kandydaci na pary, polozenie plyty FWD, przejscia TSD, os, pary zerowe, sesje, ciagi)
           ("geo_pairs", "geometry_pairs.csv"), ("geo_fwd", "fwd_plate_positions.csv"), ("geo_passes", "tsd_passes.csv"),
           ("geo_corridors", "corridors.csv"), ("geo_nulls", "geometry_null_pairs.csv"),
-          ("geo_sessions", "fwd_sessions.csv"), ("geo_runs", "fwd_session_runs.csv"))
+          ("geo_sessions", "fwd_sessions.csv"), ("geo_runs", "fwd_session_runs.csv"), ("geo_sections", "sections.csv"))
 
 
 def _target(path: Path, overwrite: bool) -> Path:
@@ -73,6 +73,12 @@ def write_n4(cfg: N4Config, result: dict) -> list:
             continue
         p = _target(out_dir / name, cfg.output.overwrite)
         df.to_csv(p, index=False, encoding="utf-8")
+        written.append(p)
+    rep = result.get("section_report")
+    if rep and cfg.geometry.sections.report_html and len(rep["sections"]):
+        from .section_report import write_review
+        p = _target(out_dir / "section_review.html", cfg.output.overwrite)
+        write_review(p, rep["sections"], rep["matches"], rep["runs"], rep["sessions"], cfg.geometry.sections.report_max_sections)
         written.append(p)
     p = _target(out_dir / "meta.json", cfg.output.overwrite)
     p.write_text(json.dumps(result["meta"], ensure_ascii=False, indent=2, default=str), encoding="utf-8")

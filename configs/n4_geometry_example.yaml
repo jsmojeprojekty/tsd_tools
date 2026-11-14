@@ -25,6 +25,11 @@ geometry:
   layers: [A, B]                  # warstwy jakosci polozenia FWD wchodzace do porownania
   same_year_only: true            # ten sam rok kalendarzowy FWD i TSD (inaczej +-1 rok, flagowane kolumna same_year)
   require_valid_d0: true          # tylko pary z waznym d0 po obu stronach (okno TSD >= min_rows wierszy)
+  sections:                       # odcinki wspolne TSD-FWD wg Tab. 3.2 (progi domyslne = raport): wykrywanie + raport przegladu
+    enabled: true
+    review_csv: null              # decyzje recznego przegladu: session_id, run_id, status (confirmed / rejected)
+    require_section: false        # true: do porownania tylko pary z odcinka wspolnego (bez odrzuconych)
+    report_html: true             # section_review.html: slad GPS, monotonicznosc station_m, "linia do linii" d0/D0
   window_m: 5.0                   # polowka okna wartosci TSD (W5)
   min_rows: 3
 

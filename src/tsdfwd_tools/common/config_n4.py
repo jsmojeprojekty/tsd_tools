@@ -119,6 +119,26 @@ class N4FwdColumns:
 
 
 @dataclass
+class N4Sections:
+    """Odcinki wspolne TSD-FWD (kryteria Tab. 3.2): wykrywanie, raport przegladu i opcjonalny filtr par."""
+    enabled: bool = True
+    radius_m: float = 8.0
+    min_coverage_pct: float = 30.0
+    min_abs_spearman: float = 0.80
+    bearing_tol_deg: float = 30.0
+    max_days: float = 400.0
+    lane_same_max_m: float = 0.75
+    lane_adjacent_max_m: float = 2.0
+    same_year_only: bool = True
+    min_overlap_len_m: float = 500.0
+    min_matched_stations: int = 5
+    review_csv: str | None = None          # decyzje recznego przegladu: session_id, run_id, status (confirmed / rejected)
+    require_section: bool = False          # tylko pary z odcinka wspolnego (z pominieciem rejected)
+    report_html: bool = True               # raport przegladu "linia do linii" (SVG)
+    report_max_sections: int = 300
+
+
+@dataclass
 class N4Geometry:
     tsd_rows: list = field(default_factory=list)         # pliki CSV z wierszami TSD (np. *_rows.csv z N3 z rows_csv: true)
     tsd_runs_csv: str | None = None                      # opcjonalnie: run_id, date [, calib_interval, data_tier, recorder_group]
@@ -137,6 +157,7 @@ class N4Geometry:
     layers: list = field(default_factory=lambda: ["A", "B"])
     same_year_only: bool = True
     require_valid_d0: bool = True                        # tylko pary z waznym d0 po obu stronach (okno >= min_rows wierszy)
+    sections: N4Sections = field(default_factory=N4Sections)
     window_m: float = 5.0                                # polowka okna wartosci TSD (W5)
     min_rows: int = 3
     date_override: str | None = None                     # data wspolna dla wszystkich przejazdow TSD (gdy brak jej w nazwie/pliku)
@@ -181,6 +202,8 @@ def build_n4_config(data: dict, base_dir=".") -> N4Config:
         for rule in g.antenna:
             if not isinstance(rule, dict) or not {"device", "d_m"} <= set(rule):
                 raise ConfigError("geometry.antenna: kazda regula to slownik z kluczami device, d_m [, era, confirmed, from, until]")
+        if g.sections.radius_m <= 0 or g.sections.min_matched_stations < 1:
+            raise ConfigError("geometry.sections: radius_m > 0 oraz min_matched_stations >= 1")
         for name, rng in g.calib_intervals.items():
             if len(rng) != 2:
                 raise ConfigError(f"geometry.calib_intervals.{name}: oczekiwano [od, do] (RRRR-MM-DD)")

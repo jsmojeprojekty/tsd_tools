@@ -3,7 +3,7 @@
 Pakiet `tsdfwd_tools` — narzedzia TSD/FWD dla Zakladu Diagnostyki Nawierzchni IBDiM (N1-N4), odtwarzajace metody
 raportu PW.S-1063 (Etap II). Projekt: `docs\PROJEKT.md`, inwentarz zrodel: `docs\INWENTARZ.md`, dziennik: `docs\DZIENNIK.md`.
 
-Stan: E2b — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N2 `layer_temp`, N3 `tsd_network` i N4 `tsd_fwd_compare` (tryby `pairs` i `geometry`) oraz instrukcje dla inzynierow. Do zrobienia w E2c: odcinki wspolne (Tab. 3.2), wyrownanie profilem i estymator lambdy.
+Stan: E2c — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N2 `layer_temp`, N3 `tsd_network` i N4 `tsd_fwd_compare` (tryby `pairs` i `geometry`) oraz instrukcje dla inzynierow. Tryb `geometry` wykrywa tez odcinki wspolne (Tab. 3.2) i zapisuje raport przegladu `section_review.html`. Nadal brak: wyrownania profilem i estymatora lambdy.
 
 ## Instrukcje dla inzynierow
 `docs\INSTRUKCJA_N1.md` (korekta temperaturowa FWD), `docs\INSTRUKCJA_N2.md` (temperatura warstwy), `docs\INSTRUKCJA_N3.md` (TSD na sieci + XML DSN),
@@ -49,7 +49,7 @@ Wyniki: `agreement*.csv`, `conditions.csv`, `calibration.csv`, `null_checks.csv`
 C:\ENV\narzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs\n4_geometry_example.yaml
 ```
 Wejscie: wiersze TSD (np. `*_rows.csv` z N3, surowy pikietaz) i stacje FWD (CSV z aparatem, data, D0 i temperatura z N1). N4 buduje wspolna os pasa,
-ustala polozenie plyty FWD, tworzy pary geometryczne (okna +-5 m) i pary zerowe, po czym liczy te same miary co w trybie `pairs`.
+wykrywa odcinki wspolne (Tab. 3.2), ustala polozenie plyty FWD, tworzy pary geometryczne (okna +-5 m) i pary zerowe, po czym liczy te same miary co w trybie `pairs`.
 
 ## Dopasowanie wspolczynnikow z wlasnych wizyt (opcjonalnie)
 ```bash

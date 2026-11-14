@@ -226,6 +226,7 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
         meta["geometry"] = geo["meta"]
         meta["geometry"]["config"] = asdict(cfg.geometry)
         result.update(geo["tables"])
+        result["section_report"] = geo.get("section_report")
     if not dry_run:
         from .output import write_n4
         result["outputs"] = write_n4(cfg, result)

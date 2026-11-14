@@ -186,3 +186,37 @@ def test_candidates_and_null_pairs_match_golden_pairs(dbs, plate, tsd_pass_data)
     assert np.abs(mn.center_s - mn.center_s_ref).max() < 1e-6                            # w tym permutacje (rng wspolny)
     assert (mn.win5_n == mn.win5_n_ref).all()
     assert (mn.win5_tsd_id_min.fillna(-1) == mn.win5_tsd_id_min_ref.fillna(-1)).all()
+
+
+def test_detect_sections_reproduces_445_sections_of_v4(dbs):
+    """T-N4-11: detect_sections (Tab. 3.2) na calej bazie v4 = tabela `tsd_fwd_sections`: 445 sekcji, wszystkie miary identyczne;
+    167 sekcji z przegladu recznym (`confirmed`) to dokladnie sekcje o pasie same/adjacent kierunku same (87 + 80)."""
+    from tsdfwd_tools.compare import sections as SEC
+    v4 = dbs["v4"]
+    ref = pd.read_sql("SELECT * FROM tsd_fwd_sections", v4)
+    st = pd.read_sql(
+        "SELECT s.station_id, s.session_pk, s.latitude AS lat, s.longitude AS lon, s.heading_deg AS heading, s.station_m, "
+        "sess.date_start, sess.date_end FROM fwd_stations s JOIN fwd_sessions sess ON sess.session_pk = s.session_pk "
+        "WHERE s.latitude IS NOT NULL AND s.longitude IS NOT NULL ORDER BY s.session_pk, s.station_m, s.station_id", v4)
+    sessions = {k: g.reset_index(drop=True) for k, g in st.groupby("session_pk", sort=True)}
+    info = {k: (g.date_start.iloc[0], g.date_end.iloc[0]) for k, g in sessions.items()}
+    files = pd.read_sql("SELECT file_id, file_date FROM tsd_files", v4)
+    rows = pd.read_sql("SELECT file_id, latitude AS lat, longitude AS lon, heading_deg AS heading, chainage_m AS chainage "
+                       "FROM tsd_measurements WHERE latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY file_id, chainage_m", v4)
+    runs = {k: g.reset_index(drop=True) for k, g in rows.groupby("file_id", sort=True)}
+    del rows
+    mine, _, cnt = SEC.detect_sections(runs, dict(zip(files.file_id, files.file_date)), sessions, info)
+    assert len(mine) == len(ref) == 445
+    m = mine.merge(ref, left_on=["session_id", "run_id"], right_on=["session_pk", "tsd_file_id"], suffixes=("", "_ref"))
+    assert len(m) == 445
+    for col in ("direction", "lane_class", "fwd_matched", "fwd_total", "fwd_in_overlap"):
+        assert (m[col].astype(str) == m[col + "_ref"].astype(str)).all(), col
+    for col in ("spearman_corr", "coverage_pct", "coverage_full_pct", "station_m_min", "station_m_max", "chainage_m_min",
+                "chainage_m_max", "median_xtrack_m", "mean_bearing_diff"):
+        assert np.nanmax(np.abs(m[col].to_numpy(float) - m[col + "_ref"].to_numpy(float))) < 1e-9, col
+    rev = pd.read_sql("SELECT section_id, status FROM tsd_fwd_section_review WHERE status = 'confirmed'", v4)
+    assert len(rev) == 167
+    conf = ref[ref.section_id.isin(rev.section_id)]
+    assert set(conf.direction) == {"same"} and set(conf.lane_class) == {"same", "adjacent"}
+    eligible = ref[(ref.direction == "same") & ref.lane_class.isin(["same", "adjacent"])]
+    assert len(eligible) == 167                                       # recall i precyzja wzgledem przegladu recznego: 167/167

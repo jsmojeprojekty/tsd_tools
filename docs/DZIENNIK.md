@@ -295,3 +295,30 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 **Co zostaje:** E2c (opcjonalnie): `detect_sections` + raport "linia do linii", wyrownanie profilem i scalanie duplikatow pasa (dla danych z kanalem `profile1`), estymator lambdy (Q-N4-5); do ustalenia: `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16, potwierdzenie `SCI_SUB`.
 
 **STOP — decyzja:** brak decyzji blokujacych; do rozstrzygniecia zakres E2c (patrz wyzej).
+
+## 2026-11-14 — E2c: N4 odcinki wspolne (Tab. 3.2) i raport przegladu „linia do linii”
+
+**Co zrobiono**
+- `compare\sections.py`: `detect_sections` (kryteria Tab. 3.2: ten sam rok i odstep <= 400 dni, >= 5 stacji w promieniu 8 m, pokrycie >= 30 % wzgledem stacji w obwiedni TSD, zakres pikietazu >= 500 m, |Spearman(station_m, pikietaz)| >= 0,80, kierunek wg kursow 30/150 st., klasa pasa 0,75/2,0 m) z wejsciem w DataFrame'ach i zapytaniami do drzewa KD wektorowo (te same wartosci co petla po stacjach). Licznik odrzuconych par wg przyczyny (rok, za malo stacji, pokrycie, krotki zakres, monotonicznosc, niejednoznaczny kierunek).
+- `compare\section_report.py`: raport `section_review.html` (SVG, bez zaleznosci graficznych): slad GPS TSD i stacje FWD, wykres station_m - pikietaz z regresja, „linia do linii” (d0 TSD gesta linia i D0 FWD punkty na wspolnym pikietazu). Decyzje przegladu wracaja plikiem `geometry.sections.review_csv` (session_id, run_id, status).
+- Integracja z trybem `geometry`: `sections.csv`, kolumny par `in_section`, `section_id`, `section_lane`, `section_direction`, `section_status`, opcjonalny filtr `geometry.sections.require_section` (pary z odcinka, bez odrzuconych). Domyslnie odcinki NIE filtruja par (zgodnie ze zrodlem: pary wynikaja z korytarza i roku, odcinki sa kontrola/przegladem).
+- Decyzja bez zmiany metody: brak `matplotlib` w srodowisku — raport rysowany wlasnym SVG zamiast instalowania pakietow; brak kursu TSD/stacji uzupelniany z kolejnosci punktow (jak `compute_headings` w bazie). Kryteria przegladu recznego nie dostaly zadnych nowych progow (raport pokazuje, nie ocenia).
+
+**Co sprawdzono (przebieg pelny: patrz wynik testow; nowe: 9 jednostkowych, 1 integracyjny, 1 regresji)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| T-N4-11 `detect_sections` na calej bazie v4 (251 sesji FWD x 239 plikow TSD z GPS) vs `tsd_fwd_sections`: liczba sekcji | 445 = 445, te same pary (sesja, plik) | 0 | OK |
+| T-N4-11 kierunek, klasa pasa, `fwd_matched`, `fwd_total`, `fwd_in_overlap` | 100 % zgodne | 0 | OK |
+| T-N4-11 Spearman, pokrycie (oba), zakresy `station_m` i pikietazu, mediana odleglosci poprzecznej, srednia roznica kursow | max roznica < 1e-9 (w skrypcie kontrolnym dokladnie 0) | tol. 1e-9 | OK |
+| T-N4-11 przeglad reczny: 167 `confirmed` vs sekcje kierunku same i pasa same/adjacent | 167 = 167 (87 same/same + 80 same/adjacent), recall 167/167, precyzja 167/167 | 0 | OK |
+| odrzucone pary w v4 wg przyczyny | rok 3776, za malo stacji 60, pokrycie 27, krotki zakres 13, monotonicznosc 0 | — | informacyjnie |
+| testy syntetyczne: kierunek przeciwny, klasy pasa 0,5/1,2/5 m, odrzucenia wg przyczyny, pokrycie w obwiedni, raport SVG, integracja (filtr, review, wylaczenie) | zgodne | wg zalozen | OK |
+
+**Uwagi**
+- Odcinki liczone sa na surowym GPS (antena FWD, GPS wiersza TSD bez lagu), jak w zrodle; plaskie przyblizenie 111320 m/stopien tez jak w zrodle.
+- 278 z 445 sekcji ma pas `far` albo kierunek przeciwny — w przegladzie recznym nie byly rozpatrywane (zrodlo: `lane-filter same,adjacent`), tu sa w `sections.csv` z kolumna `lane_class`/`direction`.
+
+**Co zostaje:** wyrownanie profilem i scalanie duplikatow pasa (dla danych z kanalem `profile1`), estymator lambdy (Q-N4-5); do ustalenia: `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16, potwierdzenie `SCI_SUB`.
+
+**STOP — decyzja:** brak decyzji blokujacych.
+

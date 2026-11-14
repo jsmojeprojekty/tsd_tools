@@ -23,6 +23,7 @@ from ..tsd.io import date_from_name
 from . import geo as G
 from . import fwd_position as FP
 from . import pairing as PA
+from . import sections as SEC
 
 log = logging.getLogger(__name__)
 
@@ -149,6 +150,40 @@ def position_params(cfg: N4Config) -> FP.PositionParams:
     return FP.PositionParams(rules=rules, sigma_era=sigma, eps_variant=g.eps_variant, axis=ax)
 
 
+def detect_common_sections(cfg: N4Config, runs_df: dict, rtab: pd.DataFrame, stations: pd.DataFrame, files: dict):
+    """Odcinki wspolne wg Tab. 3.2 na wejsciu trybu geometry. Zwraca (tabela odcinkow, dopasowania, liczniki, przejazdy i sesje do raportu)."""
+    sc = cfg.geometry.sections
+    params = SEC.SectionParams(radius_m=sc.radius_m, min_coverage_pct=sc.min_coverage_pct, min_abs_spearman=sc.min_abs_spearman,
+                               bearing_tol_deg=sc.bearing_tol_deg, max_days=sc.max_days, lane_same_max_m=sc.lane_same_max_m,
+                               lane_adjacent_max_m=sc.lane_adjacent_max_m, same_year_only=sc.same_year_only,
+                               min_overlap_len_m=sc.min_overlap_len_m, min_matched_stations=sc.min_matched_stations)
+    runs = {}
+    for rid, d in runs_df.items():
+        x = d.rename(columns={"chainage": "chainage"}).copy()
+        x = x[np.isfinite(x["lat"]) & np.isfinite(x["lon"])].sort_values("chainage", kind="stable").reset_index(drop=True)
+        runs[rid] = SEC.ensure_headings(x, ["chainage"])
+    sessions, info = {}, {}
+    for sid, g in stations.groupby("session_id", sort=True):
+        g = SEC.ensure_headings(g.reset_index(drop=True).rename(columns={"heading_deg": "heading"}), ["time", "station_id"])
+        g = g.sort_values(["station_m", "station_id"], kind="stable").reset_index(drop=True)
+        sessions[sid] = g
+        dates = g["date"].astype(str)
+        info[sid] = (dates.min(), dates.max())
+    run_dates = dict(zip(rtab["run_id"], rtab["date"]))
+    tab, matches, cnt = SEC.detect_sections(runs, run_dates, sessions, info, params)
+    status = {}
+    if sc.review_csv:
+        rp = resolve_path(sc.review_csv, cfg.base_dir)
+        rv = _read_csv(rp, "przegladu odcinkow")
+        files["sections_review_csv"] = str(rp)
+        if not {"session_id", "run_id", "status"} <= set(rv.columns):
+            raise ConfigError("geometry.sections.review_csv: wymagane kolumny session_id, run_id, status")
+        status = {(r["session_id"], str(r["run_id"])): str(r["status"]).strip().lower() for r in rv.to_dict("records")}
+    if len(tab):
+        tab["review_status"] = [status.get((s, str(r)), "unreviewed") for s, r in zip(tab["session_id"], tab["run_id"])]
+    return tab, matches, cnt, runs, sessions
+
+
 def build_geometry_pairs(cfg: N4Config) -> dict:
     """Zwraca slownik: pairs (DataFrame w formacie wejscia trybu pairs, nazwy znormalizowane), nulls (pair_id, null_type, d0_w5,
     d0_valid_w5), tabele pomocnicze (geo_pairs, geo_fwd, geo_passes, geo_corridors, geo_nulls), files i meta."""
@@ -201,6 +236,11 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
 
     plate, sessions, fwd_runs = FP.fwd_plate_positions(corridors, stations.drop(columns=["fwd_d0", "fwd_t12"]), ppar)
     plate = plate.merge(stations[["station_id", "fwd_d0", "fwd_t12"]], on="station_id", how="left")
+    sec_tab, sec_matches, sec_cnt, sec_runs, sec_sessions = (pd.DataFrame(), {}, {}, {}, {})
+    if g.sections.enabled:
+        sec_tab, sec_matches, sec_cnt, sec_runs, sec_sessions = detect_common_sections(cfg, runs_df, rtab, stations, files)
+        log.info("odcinki wspolne (Tab. 3.2): %d (odrzucone pary: %s)", len(sec_tab),
+                 {k: v for k, v in sec_cnt.items() if k != "n_sections" and v})
     cand = PA.build_candidates(plate, passes_df, pass_rows)
     if cand.empty:
         raise ConfigError("brak par kandydackich: stacje FWD nie leza na wspolnych korytarzach z przejazdami TSD "
@@ -220,7 +260,20 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
     cand["tsd_t12"] = t12
     cand["group"] = cand["era"].astype(str) + "_" + cand["tsd_year"].astype(str)
 
+    if g.sections.enabled:
+        if len(sec_tab):
+            key = sec_tab[["session_id", "run_id", "section_id", "lane_class", "direction", "review_status"]].copy()
+            key["run_id"] = key["run_id"].astype(str)
+            key.columns = ["session_id", "file_id", "section_id", "section_lane", "section_direction", "section_status"]
+            cand["file_id"] = cand["file_id"].astype(str)
+            cand = cand.merge(key, on=["session_id", "file_id"], how="left")
+        else:
+            for c_ in ("section_id", "section_lane", "section_direction", "section_status"):
+                cand[c_] = None
+        cand["in_section"] = cand["section_id"].notna().astype(int)
     keep = cand["layer"].isin(g.layers)
+    if g.sections.enabled and g.sections.require_section:
+        keep &= (cand["in_section"] == 1) & (cand["section_status"] != "rejected")
     if g.same_year_only:
         keep &= cand["same_year"] == 1
     if g.require_valid_d0:
@@ -254,9 +307,13 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
                 lag_m=g.lag_m, eps_variant=g.eps_variant, sigma_era=ppar.sigma_era,
                 antenna_rules=[asdict(r) for r in ppar.rules],
                 layers_count={k: int(v) for k, v in cand["layer"].value_counts().items()},
+                sections=dict(enabled=g.sections.enabled, **{k: int(v) for k, v in sec_cnt.items()},
+                              pairs_in_section=int(cand["in_section"].sum()) if "in_section" in cand else 0),
                 note=("s_ref = s_ref_gps (bez wyrownania profilem), bez scalania duplikatow pasa; okno wartosci TSD wg s_ref "
                       "(+-%g m, >= %d wierszy z waznym d0). Polozenie TSD skorygowane o lag %+g m (jedna stala globalna)."
                       % (g.window_m, g.min_rows, g.lag_m)))
     return dict(pairs=pairs, nulls=nulls_out, files=files, meta=meta,
                 tables=dict(geo_pairs=cand, geo_fwd=plate, geo_passes=passes_df, geo_corridors=corr_tab,
-                            geo_nulls=nulls_all, geo_sessions=sessions, geo_runs=fwd_runs))
+                            geo_nulls=nulls_all, geo_sessions=sessions, geo_runs=fwd_runs, geo_sections=sec_tab),
+                section_report=(dict(sections=sec_tab, matches=sec_matches, runs=sec_runs, sessions=sec_sessions)
+                                if g.sections.enabled else None))
