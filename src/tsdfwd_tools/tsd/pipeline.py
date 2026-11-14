@@ -81,7 +81,7 @@ def process_run(cfg: N3Config, path: Path) -> dict:
     d = run.data.copy().reset_index(drop=True)
     n = len(d)
     chain = d["chainage_m"].to_numpy(float)
-    d["pos_m"] = chain + p.position_offset_m
+    d["pos_m"] = chain - p.position_offset_m          # konwencja lagu (tsd_position_offset = -4,8): punkt pomiaru lezy o 4,8 m dalej niz pikietaz wiersza
     d["speed_kmh"] = d["speed_ms"] * 3.6
 
     t12, t_source = load_layer_temperature(cfg, path.name, chain)

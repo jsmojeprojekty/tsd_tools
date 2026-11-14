@@ -3,7 +3,11 @@
 Pakiet `tsdfwd_tools` — narzedzia TSD/FWD dla Zakladu Diagnostyki Nawierzchni IBDiM (N1-N4), odtwarzajace metody
 raportu PW.S-1063 (Etap II). Projekt: `docs\PROJEKT.md`, inwentarz zrodel: `docs\INWENTARZ.md`, dziennik: `docs\DZIENNIK.md`.
 
-Stan: E4 — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N2 `layer_temp`, N3 `tsd_network` i N4 `tsd_fwd_compare` (tryb `pairs`). Tryb `geometry` N4 i instrukcje dla inzynierow (E5) w kolejnych etapach.
+Stan: E5 — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N2 `layer_temp`, N3 `tsd_network` i N4 `tsd_fwd_compare` (tryb `pairs`) oraz instrukcje dla inzynierow. Tryb `geometry` N4 w kolejnym etapie (E2b).
+
+## Instrukcje dla inzynierow
+`docs\INSTRUKCJA_N1.md` (korekta temperaturowa FWD), `docs\INSTRUKCJA_N2.md` (temperatura warstwy), `docs\INSTRUKCJA_N3.md` (TSD na sieci + XML DSN),
+`docs\INSTRUKCJA_N4.md` (porownanie TSD-FWD). Kazda opisuje dane wejsciowe, uruchomienie, wyniki, flagi i ograniczenia.
 
 ## Srodowisko
 ```bash

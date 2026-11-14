@@ -312,6 +312,15 @@ def test_cli_n3_analytic_values_and_xml(tmp_path, make_tsd):
         assert (out / f"T4202504230012_agg_{step}m.csv").is_file()
 
 
+def test_n3_position_offset_follows_lag_convention(tmp_path, make_tsd):
+    tsd = make_tsd(n=120, d0_base=180.0)
+    for off, expected in ((0.0, 0.0), (-4.8, 4.8)):
+        cfg = _cfg(tmp_path, tsd, xml_uc={"enabled": False}, processing={"position_offset_m": off})
+        assert main(["tsd_network", "--config", str(cfg)]) == 0
+        rows = pd.read_csv(tmp_path / "out" / "T4202504230012_rows.csv")
+        assert (rows["pos_m"] - rows["chainage_m"]).to_numpy() == pytest.approx(expected, abs=1e-9)
+
+
 def test_hampel_rejects_whole_bowl_and_window_median_is_robust(tmp_path, make_tsd):
     tsd = make_tsd(n=120, spike_rows=(60,), d0_base=180.0)
     cfg = _cfg(tmp_path, tsd, xml_uc={"enabled": False})

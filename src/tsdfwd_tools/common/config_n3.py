@@ -48,7 +48,7 @@ class N3Processing:
     min_rows_in_window: int = 3
     gof_threshold: float = 0.5                           # atrybut okna (udzial czasz GoF >= 0,5)
     aggregate_m: list = field(default_factory=lambda: [50, 100])
-    position_offset_m: float = 0.0                       # przesuniecie polozenia ugiec wzgledem pikietazu (konwencja w E2b)
+    position_offset_m: float = 0.0                       # lag polozenia ugiec (konwencja projektu: -4,8 => pos = pikietaz + 4,8 m); domyslnie 0 (decyzja Jacka)
     hampel: N3Hampel = field(default_factory=N3Hampel)
     correction: N3Correction = field(default_factory=N3Correction)
     to_fwd_scale_enabled: bool = False                   # dodatkowe kolumny w skali FWD

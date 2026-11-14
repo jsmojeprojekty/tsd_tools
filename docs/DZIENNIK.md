@@ -236,3 +236,26 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 **Co zostaje:** E5 (instrukcje INSTRUKCJA_N1..N4.md), E2b (tryb `geometry` N4); do ustalenia: Q-N3-14, Q-N3-15, Q-N3-16, `UC_Schema.xsd`, Q-N4-3.
 
 **STOP — decyzja:** brak decyzji blokujacych E5.
+
+## 2026-11-14 — E5: instrukcje dla inzynierow + rozstrzygniecie Q-N4-3
+
+**Co zrobiono**
+- `docs\INSTRUKCJA_N1.md`, `INSTRUKCJA_N2.md`, `INSTRUKCJA_N3.md`, `INSTRUKCJA_N4.md`: do czego sluzy narzedzie, co trzeba miec, uruchomienie, najwazniejsze ustawienia, wyniki, flagi (z opisem "co robic"), ograniczenia. N1 zawiera opis `fwd_fit`; N2: uczciwa dokladnosc (H 1,75 C eksploracyjny vs C 2,73 C niezalezny), znaczenie `NIGHT`/`CALIB_BOUND_HI` (44 % w zbiorze odniesienia), u95 jako heurystyka, tryb offline i jedyne polaczenie sieciowe (archiwum Open-Meteo), teren zacieniony nieobslugiwany; N3: polozenie ugiec, status XML bez walidacji XSD, definicje robocze (`SCI_SUB`, `D_300`); N4: tylko `pairs`, zasada pary tylko geometrycznej, jak czytac kontrole zerowe.
+- Q-N4-3 rozstrzygniete (Jacek, 2026-11-14; patrz PROJEKT 8.2): -4,8 m jest wliczone w `tsd_sref` (`e1_sref.py`, `corrected_xy`), wiec okna W5 ja zawieraja; konwencja lagu: pozycja = pikietaz - lag = pikietaz + 4,8 m. N3: `position_offset_m` domyslnie 0 (decyzja Jacka), opcja w konfiguracji.
+- **Zmiana w kodzie N3 (znak):** `pos_m = pikietaz - position_offset_m` (wczesniej `+`), zeby wartosc -4,8 z projektu znaczyla to samo co w calym projekcie. Przy domyslnym 0 wyniki bez zmian. Dodany test `test_n3_position_offset_follows_lag_convention`.
+
+**Co sprawdzono**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| kazda flaga z `Flag`, `TsdFlag`, `LayerFlag` opisana w odpowiedniej instrukcji | wszystkie wymienione | 0 brakujacych | OK |
+| kazdy klucz konfiguracji cytowany w instrukcjach istnieje w dataclasses konfiguracji | 47 kluczy, wszystkie istnieja (3 "niezgodne" to nazwy plikow `layer_temp.csv`, `calibration.csv`, `conditions.csv`) | 0 | OK |
+| opisane zachowania sprawdzone w kodzie (brak meteo -> wynik pusty z flagami, `fwd_fit` za malo danych -> wiersz z adnotacja, `mode: geometry` -> blad) | zgodne po poprawce dwoch opisow | 2 poprawione w trakcie | OK |
+| N3: `pos_m - chainage_m` dla `position_offset_m` 0 i -4,8 | 0 i +4,8 | < 1e-9 | OK |
+
+**Uwagi**
+- Instrukcje opisuja wylacznie to, co jest zaimplementowane; nie dodaja nowych metod ani parametrow. Przyklady z liczbami (RMSE, beta, lambda) pochodza z raportu i dziennika.
+- Walidacja XML wzgledem `UC_Schema.xsd` pozostaje otwarta (dostarczy Jacek za kilka dni; do tego czasu XML tylko wg zalacznika H p. 4.2 i kontroli struktury).
+
+**Co zostaje:** E2b (tryb `geometry` N4: odcinki, regula anteny P043b, `s_ref`, pary zerowe); do ustalenia: `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16, potwierdzenie `SCI_SUB`.
+
+**STOP — decyzja:** brak decyzji blokujacych E2b.

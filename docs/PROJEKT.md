@@ -158,7 +158,7 @@ processing:
 qc:
   gps_gyro: true
   channel_shift: true
-  position_offset_m: -4.8
+  position_offset_m: 0.0     # w implementacji: processing.position_offset_m, domyslnie 0; lag -4,8 => pozycja = pikietaz + 4,8 m (Q-N4-3)
 output:
   dir: "D:/wyniki/n3"
   csv: true
@@ -417,7 +417,7 @@ Kolejnosc E2 (N4) przed E3 (N3) i E4 (N2) wynika z promptu; zalezy od niej, ze N
 ### 8.2 E2 (N4)
 - **Q-N4-1 Pary zerowe — kanoniczne wartosci r w obrebie sesji.** lustro P071: 0,155 / 0,135 / 0,096; przeliczenie z `e2b2_null_values` i `e2b2b`: 0,114-0,118 / 0,134-0,141 / 0,023-0,027. Hipoteza: rozna definicja okna (zakres `tsd_id` vs po `s_ref`). Ktore sa kanoniczne dla testu T-N4-05? Do czasu decyzji test = `xfail`.
 - **Q-N4-2 Regula anteny FWD i granica daty.** Domyslnie P043b (8002-367: d=5,5 m do 2025-10-09, potem 0), nie `e1_sref` (5,0 m od 2025-01-01). Zgoda?
-- **Q-N4-3 Korekta -4,8 m.** Czy `tsd_position_offset` jest juz wliczona w `s_ref` i okna W5; konwencja znaku. Do ustalenia przed trybem `geometry`.
+- **Q-N4-3 Korekta -4,8 m.** Czy `tsd_position_offset` jest juz wliczona w `s_ref` i okna W5; konwencja znaku. Do ustalenia przed trybem `geometry`. **ROZSTRZYGNIETE 2026-11-14 (z kodu zrodlowego, potwierdzone przez Jacka):** korekta jest wliczona w `tsd_sref` (`e1_sref.py`, `corrected_xy` z lagiem -4,8 m przy budowie `s_ref`), wiec okna W5 po `s_ref` ja zawieraja i w trybie `geometry` stosuje sie ja dokladnie raz (nie dokladac do `s_ref`). Konwencja znaku (lag E0-C): wiersz o pikietazu s dostaje polozenie GPS z `s - lag` = `s + 4,8 m`; punkt pomiaru lezy 4,8 m dalej wzdluz toru niz GPS tego samego wiersza. N3 (brak `s_ref`): `processing.position_offset_m` domyslnie 0 (decyzja Jacka), opcja w konfiguracji w tej samej konwencji (`pos = pikietaz - position_offset_m`; wpisac -4,8 dla korekty).
 - **Q-N4-4 Zakres trybu `geometry`.** Tryb `pairs` (gotowe pary + T12) w E2 na pewno. Pelny tryb `geometry` (ok. 3500 linii: korytarze, polozenie plyty, kandydaci, `detect_sections`) — w E2 czy odlozyc do E2b (osobny krok po zatwierdzeniu)? Proponuje: najpierw `pairs`, potem `geometry` jako E2b.
 - **Q-N4-5 sigma_FWD i lambda.** Domyslnie lambda d0 = 0,11787 (sigma_TSD 0,296408 z par przejazdow w binach po `s_ref`; sigma_FWD 0,101763 z `e12_lambda`); `katalog_produktow.md` zabrania 0,09. Estymator lambda w narzedziu dla nowych danych — czy wlaczyc, czy lambda tylko z konfiguracji?
 - **Q-N4-6 Warunek "aparat x okres kalibracji TSD".** Zrodlo uzywa `tsd_year`; raport wymaga `calib_interval` (K2024-03-01, K2025-05-27, K2026-05-19). Domyslnie `calib_interval` + `device`; ujemne dt raportowane osobno.
