@@ -1,0 +1,74 @@
+# Rejestr odtwarzalnosci: numer testu T-xx (opis i wartosci referencyjne bierze generator z docs/PROJEKT.md, p. 6)
+# -> punkt raportu PW.S-1063 (Etap II) i nazwy testow pytest (modul::funkcja, dopuszczalne znaki * ?).
+# Punkty raportu wpisano tylko te, ktore podaja instrukcje N1-N4 i PROJEKT; brak punktu = "-" (nie zgadujemy).
+
+narzedzia:
+  N1: {nazwa: "fwd_tempcorr", punkt_raportu: "p. 7.1 (Tab. 7.1)"}
+  N2: {nazwa: "layer_temp", punkt_raportu: "model fizyczny TN (p. 7 - niepewnosc)"}
+  N3: {nazwa: "tsd_network", punkt_raportu: "p. 6.1-6.2, 7.3; zal. H p. 4.2 (XML)"}
+  N4: {nazwa: "tsd_fwd_compare", punkt_raportu: "p. 6.2-6.3, 7.3; p. 3 i 3a (tryby); Tab. 3.2 (odcinki)"}
+
+testy:
+  T-N1-01: [test_rules_and_coefficients::test_e2a3_full_coefficients, test_rules_and_coefficients::test_e2a3_full_meta_and_indices_in_file, test_rules_and_coefficients::test_tab71_is_rounded_set, test_n1_reference::test_packaged_coefficients_identical_to_source, test_n1_reference::test_prompt_reference_coefficients]
+  T-N1-02: [test_rules_and_coefficients::test_d0_values_variant_a_and_b, test_rules_and_coefficients::test_d300_values, test_rules_and_coefficients::test_identity_at_reference_temperature_and_round_trip, test_rules_and_coefficients::test_unknown_form_raises]
+  T-N1-03: [test_rules_and_coefficients::test_matches_source_apply_rule]
+  T-N1-04: [test_fwd_pipeline_units::test_indices_example_variant_a_and_b, test_fwd_pipeline_units::test_indices_are_differences_of_corrected_deflections_not_own_coefficients]
+  T-N1-05: [test_fwd_pipeline_units::test_normalize_load, test_fwd_pipeline_units::test_select_drops_rules, test_fwd_pipeline_units::test_geophone_mapping_standard_and_by_x]
+  T-N1-06: [test_fwd_pipeline_units::test_classify_session_statuses, test_fwd_pipeline_units::test_entry_possible_after_long_gap, test_fwd_pipeline_units::test_placeholder_runs_and_flags, test_fwd_pipeline_units::test_flags_to_text, test_fwd_pipeline_units::test_range_flags_variant_a_and_b, test_fwd_pipeline_units::test_index_flags_above_25c_and_nonpositive]
+  T-N1-07: ["test_fit_reference::*"]
+  T-N1-08: [test_n1_reference::test_r4_bands_own_indicator, test_n1_reference::test_r4_bands_sci300_from_corrected_deflections, test_n1_reference::test_no_references_below_10c]
+  T-N1-09: [test_config_io_cli::test_cli_end_to_end_values, test_config_io_cli::test_read_xlsx_pair, test_n1_reference::test_mdb_end_to_end]
+
+  T-N2-01: [test_n2_reference::test_t_n2_01_main_h_v2]
+  T-N2-02: [test_n2_reference::test_t_n2_02_counts_and_calibration_flags, test_n2_reference::test_flags_in_reference_run_are_plausible]
+  T-N2-03: [test_n2_reference::test_t_n2_03_per_observation_vs_candidates, test_n2_reference::test_bells3_identical_to_source]
+  T-N2-04: [test_n2_reference::test_t_n2_04_comparators]
+  T-N2-05: [test_n2_reference::test_t_n2_05_rmse_by_time_of_day]
+  T-N2-06: [test_n2_units::test_solver_*, test_n2_units::test_surface_temperature_increases_with_a_sw_at_noon, test_n2_units::test_calibration_round_trip_recovers_a_sw, test_n2_units::test_calibrate_single_shot_branches, test_n2_units::test_flags_*, test_n2_units::test_flag_snow_and_position, test_n2_units::test_meteo_gap_flag_when_raw_data_missing, test_n2_units::test_u95_by_hour_bins, test_n2_units::test_bells3_*]
+  T-N2-07: [test_n2_units::test_om_utc_to_local_*, test_n2_units::test_quantize_and_cache_name, test_n2_units::test_plan_windows_merges_close_days]
+  T-N2-08: [test_n2_units::test_fetch_*, test_n2_units::test_store_*]
+  T-N2-09: [test_n2_units::test_builtin_params_hash, test_n2_units::test_params_values_and_validation]
+  T-N2-10: [test_n2_reference::test_t_n2_10_z15_pairs]
+
+  T-N3-01: [test_n3_reference::test_integrals_match_e2a2_autc_var]
+  T-N3-02: [test_n3_units::test_p0_linear_profile_analytic_and_identities, test_n3_units::test_p0_nan_when_any_channel_missing_and_shape_check, test_n3_units::test_p0_shift_invariance_of_integral_difference, test_n3_units::test_trapezoid_variant_differs_from_p0_and_has_identities]
+  T-N3-03: [test_n3_units::test_p0_matches_scipy_pchip_dense_trapezoid, test_n3_units::test_p0_linear_profile_analytic_and_identities]
+  T-N3-04: [test_n3_reference::test_window_d0_pair_5288, test_n3_units::test_window_medians_closed_interval_median_of_integrals_and_gof]
+  T-N3-05: [test_n3_units::test_hampel_*]
+  T-N3-06: [test_n3_units::test_correct_d0_values_and_flags, test_n3_units::test_n3_flags_temperature_and_low_gof]
+  T-N3-07: [test_n3_reference::test_parser_reference_file_2020, test_n3_reference::test_parser_matches_database_rows, test_n3_units::test_read_synthetic_b1510off, test_n3_units::test_read_flags_and_errors]
+  T-N3-08: [test_n3_units::test_uc_writer_format_and_validator, test_n3_units::test_uc_validator_detects_problems, test_n3_units::test_cli_n3_analytic_values_and_xml, test_n3_units::test_n3_position_offset_follows_lag_convention, test_n3_reference::test_real_file_pipeline_and_xml]
+  T-N3-09: [test_n3_units::test_aggregate_bins_floor_and_counts]
+  T-N3-10: [test_n3_units::test_n3_dry_run_and_overwrite_and_fwd_scale]
+
+  T-N4-01: [test_n4_reference::test_main_rows_match_source, test_n4_reference::test_prompt_reference_values, test_n4_reference::test_pairs_have_flagged_t12]
+  T-N4-02: [test_n4_reference::test_main_rows_match_source, test_n4_reference::test_prompt_reference_values]
+  T-N4-03: [test_n4_reference::test_within_session_r_matches_lustro]
+  T-N4-04: [test_n4_reference::test_null_pairs_global_measures]
+  T-N4-05: [test_n4_reference::test_null_pairs_within_session_r_report_values, test_n4_reference::test_null_pairs_within_session_r_uncorrected_e2b2b, test_n4_reference::test_paired_bootstrap_null_deltas]
+  T-N4-06: [test_n4_reference::test_multiplier_intervals_match_source, test_n4_reference::test_conversion_groups_and_questions]
+  T-N4-07: [test_n4_reference::test_conditions_match_lustro]
+  T-N4-08: [test_n4_reference::test_calibration_multiplier_k02]
+  T-N4-09: [test_n4_reference::test_lambda_d0_constant_matches_source, test_n4_geometry_reference::test_lambda_estimator_reproduces_report_value]
+  T-N4-10: ["test_n4_units::*"]
+  T-N4-11: [test_n4_geometry_reference::test_detect_sections_reproduces_445_sections_of_v4, "test_sections::*"]
+  T-N4-12: ["test_geo::*", "test_geometry_pairs::*", "test_n4_geometry_units::*", "test_lambda::*", "test_align::*"]
+  T-N4-13: [test_n4_geometry_reference::test_fwd_plate_position_matches_e2b1_geometry]
+  T-N4-14: [test_n4_geometry_reference::test_candidates_and_null_pairs_match_golden_pairs]
+  T-N4-15: [test_n4_geometry_reference::test_tsd_rows_assignment_matches_tsd_sref]
+  T-N4-16: [test_n4_geometry_reference::test_window_values_match_z15_pairs]
+  T-N4-17: [test_n4_geometry_reference::test_profile_alignment_reproduces_tsd_sref]
+  T-N4-18: [test_n4_geometry_reference::test_axis_with_lane_merging_reproduces_whole_reference_network]
+
+# Rozbieznosci i ograniczenia, ktore czytelnik raportu powinien znac (zapis z DZIENNIK.md / PROJEKT.md)
+roznice:
+  - {id: "S-N4-4", opis: "Okno W5 liczone po s_ref, a nie po zakresie tsd_id: 7 z 2895 wartosci d0 par (korytarze 0..80) roznych od tabeli Z15; roznica wynika z definicji okna.", test: "T-N4-16"}
+  - {id: "Q-N4-1", opis: "r w obrebie sesji dla par zerowych W5: wartosci z raportu odtwarzaja sie z e2b2_null_values; wariant e2b2b daje inne liczby (znana rozbieznosc zrodel).", test: "T-N4-05"}
+  - {id: "S-N2-4", opis: "5 obserwacji po godz. 23:00 roznych od kandydata zrodlowego do 0,2 C (reszta 544/549 zgodna do 1e-6 C).", test: "T-N2-03"}
+  - {id: "Tab. 7.1", opis: "Tab. 7.1 raportu jest zaokraglona (D450 +4 %, D900 -9 % wzgledem pelnej precyzji); domyslnie e2a3_full, tab71 dostepna jako zestaw.", test: "T-N1-01"}
+
+ograniczenia:
+  - "T-N2-01 odtwarza zbior eksploracyjny H v2 (powtarzalnosc obliczen), nie jest deklaracja dokladnosci produktu; dokladnosc na zbiorze niezaleznym C v2: RMSE 2,73 C [2,44; 2,98]."
+  - "Plik XML (N3) jest sprawdzany wewnetrznie wzgledem opisu z zalacznika H p. 4.2; walidacja wzgledem UC_Schema.xsd zostanie dodana po dostarczeniu schematu."
+  - "Dane pomiarowe nie sa czescia repozytorium; testy @reference czytaja je w trybie tylko do odczytu ze sciezek podanych w tests/local_paths.yaml i bez tych danych sa pomijane."
+  - "Alignment profilem i os korytarzy zalezy od zestawu przejsc podanych na wejsciu (referencja = najdluzsze przejscie; budowa zachlanna)."

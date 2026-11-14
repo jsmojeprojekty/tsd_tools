@@ -9,6 +9,11 @@ Stan: E2f — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N2 `layer_temp`, N3 `
 `docs\INSTRUKCJA_N1.md` (korekta temperaturowa FWD), `docs\INSTRUKCJA_N2.md` (temperatura warstwy), `docs\INSTRUKCJA_N3.md` (TSD na sieci + XML DSN),
 `docs\INSTRUKCJA_N4.md` (porownanie TSD-FWD). Kazda opisuje dane wejsciowe, uruchomienie, wyniki, flagi i ograniczenia.
 
+## Odtwarzalnosc wzgledem raportu
+`docs\ODTWARZALNOSC.md` — zalacznik generowany z przebiegu testow: dla kazdego numeru testu (T-N1-01 ... T-N4-18) wartosc referencyjna z raportu
+lub bazy zrodlowej, tolerancja i wynik; rozbieznosci i ograniczenia. Odswiezenie: `python docs\odtwarzalnosc\zbuduj_odtwarzalnosc.py`
+(rejestr powiazan numer testu - punkt raportu - testy: `docs\odtwarzalnosc\rejestr.yaml`).
+
 ## Srodowisko
 ```bash
 conda create -p C:\ENV\narzedzia_tsd_fwd python=3.11

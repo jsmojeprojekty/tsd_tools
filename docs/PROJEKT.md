@@ -330,7 +330,7 @@ Legenda: tolerancja 0,01 w jednostce wielkosci, chyba ze podano inaczej. `@refer
 | T-N1-06 | Flagi: T<5, T poza zakresem A/B, brak T, 20,4, przeniesiona (klasyfikacja `classify_session` na wycinku sesji) | oczekiwane etykiety | dokladnie | @unit |
 | T-N1-07 | Fit: `qp_fit_nd` / `fit_k_profile` na `e2a3_visits` (848 wizyt; 414 z T_mid 5-30 bez stycznia) odtwarzaja wspolczynniki | D0 beta 1,60415 +-5e-5; k 0,0161092 +-3e-6; SCI300 beta 3,24407; BDI 2,8704; BCI 1,92233 | j.w. | @reference (E1 lub pominiete jesli modul fit poza zakresem) |
 | T-N1-08 | Pasma R4 (`l20_error` + `band_mean` na `e2a3_visits`): D0 lacznie no_thaw | 15-20: -0,224 %; 20-25: +0,220 %; 25-30: -1,064 %; 30-35: -3,762 % (n_with_ref 108/110/49/25) | 0,01 pp | @reference (E1 jesli odtworzenie procedury testu w zakresie; inaczej E2) |
-| T-N1-09 | Regresja na pliku FWD (XLSX Drops/stations 50_1M): pelny potok; porownanie z recznym obliczeniem | do ustalenia w E1 | 1e-6 | @unit (wycinek <= kilka MB) |
+| T-N1-09 | Regresja na pliku FWD (XLSX Drops/stations 50_1M): pelny potok; porownanie z recznym obliczeniem | 121 stacji; stacja 1: D0 = srednia 2 zrzutow znormalizowanych do 50 kN; D0_20 = D0*exp(0,0160415*(20-T)); SCI300_20 = D0_20 - D300_20 | 1e-3 (D0), 1e-9 (SCI) | @unit (wycinek <= kilka MB) |
 
 ### 6.2 N4 (E2)
 | ID | Test | Wartosc referencyjna | Tolerancja | Zrodlo |

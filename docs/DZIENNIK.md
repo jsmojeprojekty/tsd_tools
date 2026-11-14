@@ -409,3 +409,14 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 - Q-N3-16: `D_300` i `SCI_300` w XML liczone dla 0,31 m (polozenie czujnika; `SCI_300 = a031`, `D_300 = D_0 − a031`) i podawane jako 300. `D_200` i `SCI_200` bez zmian (0,20 m). Wartosci w XML zmienily sie tylko dla pol `SCI_300` i `D_300` (+0,01 m calki); test `test_cli_n3_analytic_values_and_xml` zaktualizowany.
 - Na liscie otwartych punktow zostaje wylacznie `UC_Schema.xsd`.
 
+
+## 2026-11-14 — Zalacznik "Odtwarzalnosc" (docs/ODTWARZALNOSC.md)
+
+- Cel (Jacek): narzedzia maja byc dokumentacja prac PW.S; w raporcie zalacznik lub odwolanie do repozytorium. Zrobiono zalacznik generowany z przebiegu testow, wiec nie rozjezdza sie z kodem.
+- Powstalo: `docs/odtwarzalnosc/rejestr.yaml` (numer testu T-Nx-yy -> punkt raportu i nazwy testow pytest; rozbieznosci i ograniczenia), `docs/odtwarzalnosc/zbuduj_odtwarzalnosc.py` (generator: opisy i wartosci referencyjne z PROJEKT.md p. 6 + wynik pytest/JUnit), `docs/ODTWARZALNOSC.md` (wynik). Punkty raportu wpisano tylko te, ktore podaja instrukcje N1-N4 (brak punktu = "-", nie zgadujemy).
+- Poprawka tekstu w PROJEKT.md (T-N1-09): wartosc referencyjna "do ustalenia w E1" zastapiona faktyczna (to, co sprawdza `test_cli_end_to_end_values`). Zadnych zmian w kodzie narzedzi.
+
+| Wzorzec | Uzyskano | Roznica | Status |
+|---|---|---|---|
+| 47 numerow testow (T-N1-01..09, T-N2-01..10, T-N3-01..10, T-N4-01..18) wszystkie z co najmniej jednym przypadkiem | 264 przypadki: 262 zaliczone, 2 oczekiwane niepowodzenia (xfail), 0 niezaliczonych, 0 pominietych (dane referencyjne dostepne, tylko odczyt) | 2 xfail = T-N4-05 (znana rozbieznosc Q-N4-1, przed decyzja) | OK |
+| Testy bez numeru T (konfiguracja, CLI, przypadki brzegowe) | 40 przypadkow, wszystkie zaliczone, wylistowane w p. 6 zalacznika | — | OK |
