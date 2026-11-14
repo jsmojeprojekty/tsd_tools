@@ -322,3 +322,29 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 
 **STOP — decyzja:** brak decyzji blokujacych.
 
+## 2026-11-14 — E2d: N4 estymator lambdy (Q-N4-5)
+
+**Co zrobiono**
+- `compare\lambda_est.py`: sigma_TSD z par przejazdow w tych samych binach 10 m po `s_ref` (pokrycie >= 5 wierszy, |dt| <= 1 d, poza betonem; 1,4826 MAD(ln d_i − ln d_j) / sqrt(2)), sigma_FWD z powtorzen stacji FWD miedzy sesjami tego samego aparatu w oknach 10 m (od 2024 r., |dT powierzchni| < 3 C, poza betonem; `sigma_within` = 1,4826 MAD(D − mu_ij) / sqrt(2)), lambda = sigma_FWD² / sigma_TSD². Port z `e2b2_values` (lambda TSD), `e1_sref` (biny i pary przejsc), `e12_noise` (powtarzalnosc FWD, `sigma_decomp`).
+- Integracja z trybem `geometry`: `geometry.lambda_est` (`enabled`, `apply`, progi jak w zrodle), plik `lambda_estimate.csv`, pola `lambda_d0_used` i `lambda_source` w `meta.json`. Domyslnie lambda zostaje z `measures.lambda_d0` (0,11787): oszacowanie jest tylko raportowane, a `apply: true` uzywa go w analizie. Nowe opcjonalne kolumny wejscia: `t_surface` w stacjach FWD (wymagana przy estymatorze), `time` i `concrete` w wierszach TSD.
+- Decyzje bez zmiany metody: (1) czas przejazdu bez kolumny `time` to poludnie daty — wtedy warunek |dt| <= 1 dzien oznacza ta sama lub sasiednia date (na bazie referencyjnej daje to 2047 par zamiast 2015 i sigma_TSD 0,29836 zamiast 0,29641 — dlatego estymator przyjmuje czas wiersza); (2) tryb `pairs` nie ma estymatora (brak danych powtorzen) — lambda z konfiguracji; (3) brak progu minimalnej liczby powtorzen: n par jest raportowane, a przy braku powtorzen wynik jest NaN (przy `apply` blad z komunikatem).
+
+**Co sprawdzono (241 testow zielonych + 2 `xfail`; nowe: 9 jednostkowych, 1 regresji)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| T-N4-09 sigma_FWD (`e12_lambda`, ge2024, 10 m) i liczba par | 0,101763 / 128 par (13 par sesji) | < 1e-6 | OK |
+| T-N4-09 sigma_TSD (`e2b2_lambda`, d0) i liczba par | 0,296408 / 2015 par (czas biny z `tsd_bin_stats`, pliki B_1510off ok) | < 1e-6 | OK |
+| T-N4-09 mediana roznicy log (TSD) | -0,075508 | < 1e-6 | OK |
+| T-N4-09 lambda d0 | 0,11786960020790811 | 0 (dokladnie wartosc stala w `config_n4.LAMBDA_D0`) | OK |
+| liczba wierszy w binie (`n`) vs `tsd_bin_stats` (690582 biny z `tsd_sref`) | 99,88 % zgodnych, brak binow tylko po jednej stronie | 0,12 % binow o `n` innym o kilka wierszy (nie wplywa na pary) | OK |
+| syntetyczne: sigma_TSD 0,3, sigma_FWD 0,1 -> lambda 0,111; odrzucenia (dzien, beton, pokrycie, rok FWD, temperatura, aparat, jedna sesja) | zgodne | wg zalozen | OK |
+| integracja: oszacowanie zapisane, nie uzyte bez `apply`; `apply` zmienia lambde w analizie; brak `t_surface` i `apply` bez `enabled` = blad | zgodne | — | OK |
+
+**Uwagi**
+- Estymator na danych uzytkownika wymaga powtorzen (kilka przejazdow TSD tego samego dnia i kilka sesji FWD tego samego aparatu na wspolnej drodze); z jednego przejazdu i jednej sesji lambdy nie da sie wyznaczyc.
+- FWD: w referencji `s_ref` stacji pochodzi z `fwd_sref` (regula anteny R2); w narzedziu z `s_fwd` (P043b), wiec okna 10 m moga sie minimalnie roznic — test referencyjny uzywa `fwd_sref`, aby sprawdzic sam estymator.
+
+**Co zostaje:** wyrownanie profilem i scalanie duplikatow pasa (dla danych z kanalem `profile1`); do ustalenia: `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16, potwierdzenie `SCI_SUB`.
+
+**STOP — decyzja:** brak decyzji blokujacych.
+

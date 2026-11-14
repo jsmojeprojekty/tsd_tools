@@ -89,6 +89,14 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
     else:
         df, files = load_pairs(cfg)
     m, c, u = cfg.measures, cfg.correction, cfg.uncertainty
+    lam = m.lambda_d0
+    if geo is not None and cfg.geometry.lambda_est.apply:
+        est = geo["lambda_estimate"]["lambda_d0"]
+        if not np.isfinite(est) or est <= 0:
+            raise ConfigError("geometry.lambda_est.apply: estymator nie dal poprawnej lambdy (za malo powtorzen TSD lub FWD); "
+                              "ustaw apply: false i podaj measures.lambda_d0")
+        lam = float(est)
+        log.info("lambda d0 w analizie: %.5f (estymator) zamiast %.5f (konfiguracja)", lam, m.lambda_d0)
     beta_pct = default_beta_pct() if c.beta_pct is None else c.beta_pct
     sess = df["session"].to_numpy()
     fwd0, tsd0 = df["fwd"].to_numpy(float), df["tsd"].to_numpy(float)
@@ -104,7 +112,7 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
     # --- miary zgodnosci: wszystkie warianty ---
     rows = []
     for tr, (f, t) in corrected.items():
-        rows.append(agreement_row(f, t, sess, m.lambda_d0, m.n_boot, {"variant": tr}, m.seed_ci))
+        rows.append(agreement_row(f, t, sess, lam, m.n_boot, {"variant": tr}, m.seed_ci))
     agreement = pd.DataFrame(rows)
 
     # --- grupy aparat x rok: przed i po korekcie ---
@@ -118,7 +126,7 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
                 if tr not in corrected:
                     continue
                 f, t = corrected[tr]
-                r = agreement_row(f[gm], t[gm], sess[gm], m.lambda_d0, m.n_boot, {"group": g, "variant": tr}, m.seed_ci)
+                r = agreement_row(f[gm], t[gm], sess[gm], lam, m.n_boot, {"group": g, "variant": tr}, m.seed_ci)
                 r["n_total_group"] = int(gm.sum())
                 g_rows.append(r)
         groups_df = pd.DataFrame(g_rows)
@@ -184,14 +192,14 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
         nd = pd.read_csv(npath, encoding="utf-8-sig")
         files["null_pairs_csv"] = str(npath)
     if nd is not None and len(nd):
-        real_row = agreement_row(main_f, main_t, sess, m.lambda_d0, cfg.null_checks.n_boot,
+        real_row = agreement_row(main_f, main_t, sess, lam, cfg.null_checks.n_boot,
                                  {"pair_kind": "real"}, cfg.null_checks.seed)
         null_rows.append(real_row)
         for nt in sorted(nd[null_type_col].dropna().unique()):
             tn = align_null(df.assign(pair_id=df["pair_id"]), nd, nt, null_type_col, null_tsd_col,
                             null_valid_col, "pair_id").to_numpy(float)
             f_n, t_n = correct_pair_values(fwd0, tn, df["fwd_t12"], df["tsd_t12"], c.main_treatment, beta_pct, c.t_ref_c)
-            null_rows.append(agreement_row(f_n, t_n, sess, m.lambda_d0, cfg.null_checks.n_boot,
+            null_rows.append(agreement_row(f_n, t_n, sess, lam, cfg.null_checks.n_boot,
                                            {"pair_kind": nt}, cfg.null_checks.seed))
             null_delta.append({"null_type": nt, **paired_bootstrap_null(f_n, main_t, t_n, sess, cfg.null_checks.n_boot,
                                                                        cfg.null_checks.seed)})
@@ -210,7 +218,7 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
         "inputs": {k: {"file": v, "md5": _md5(Path(v))} for k, v in files.items()},
         "config": {"correction": asdict(c), "measures": asdict(m), "uncertainty": asdict(u),
                    "conditions": asdict(cfg.conditions), "calibration": asdict(cfg.calibration)},
-        "beta_pct_used": beta_pct,
+        "beta_pct_used": beta_pct, "lambda_d0_used": lam, "lambda_source": "estimate" if lam != m.lambda_d0 else "config",
         "n_pairs": int(len(df)), "n_valid_pairs": int(ok_base.sum()), "n_sessions": int(len(np.unique(sess[ok_base]))),
         "n_t12_outside_or_missing": int(outside.sum()),
         "before_after": {k: (list(v) if isinstance(v, tuple) else v) for k, v in before_after.items()},

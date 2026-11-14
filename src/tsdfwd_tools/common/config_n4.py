@@ -100,6 +100,8 @@ class N4TsdColumns:
     gof: str = "gof"
     t12: str = "t12_c"                       # temperatura warstwy 12 cm (z N2)
     speed: str = "speed_kmh"
+    time: str = "time"                       # opcjonalnie: czas wiersza (ISO albo sekundy epoki) - do pary przejazdow w lambdzie
+    concrete: str = "concrete"               # opcjonalnie: znacznik betonu (0/1) - do wykluczenia betonu w lambdzie
 
 
 @dataclass
@@ -116,6 +118,7 @@ class N4FwdColumns:
     d0: str = "D0"                           # D0 FWD [um] znormalizowane do 50 kN, BEZ korekty temperaturowej (z N1)
     t12: str = "t_mid_c"                     # temperatura warstwy po stronie FWD (z N1/N2)
     in_concrete_zone: str = "in_concrete_zone"
+    t_surface: str = "t_surface"             # temperatura powierzchni (pirometr aparatu) - tylko do estymatora lambdy
 
 
 @dataclass
@@ -139,6 +142,21 @@ class N4Sections:
 
 
 @dataclass
+class N4LambdaEst:
+    """Estymator lambdy (Q-N4-5): lambda = sigma_FWD^2 / sigma_TSD^2 z powtorzen pomiarow (wymaga kilku przejazdow TSD tego samego
+    dnia i kilku sesji FWD tego samego aparatu na wspolnej drodze)."""
+    enabled: bool = False
+    apply: bool = False                    # uzyj oszacowania zamiast measures.lambda_d0 w miarach zgodnosci
+    bin_m: float = 10.0
+    cover_min_n: int = 5
+    tsd_max_dt_days: float = 1.0
+    fwd_from_date: str | None = "2024-01-01"
+    fwd_max_dtemp_c: float = 3.0
+    fwd_min_stations: int = 1
+    exclude_concrete: bool = True
+
+
+@dataclass
 class N4Geometry:
     tsd_rows: list = field(default_factory=list)         # pliki CSV z wierszami TSD (np. *_rows.csv z N3 z rows_csv: true)
     tsd_runs_csv: str | None = None                      # opcjonalnie: run_id, date [, calib_interval, data_tier, recorder_group]
@@ -158,6 +176,7 @@ class N4Geometry:
     same_year_only: bool = True
     require_valid_d0: bool = True                        # tylko pary z waznym d0 po obu stronach (okno >= min_rows wierszy)
     sections: N4Sections = field(default_factory=N4Sections)
+    lambda_est: N4LambdaEst = field(default_factory=N4LambdaEst)
     window_m: float = 5.0                                # polowka okna wartosci TSD (W5)
     min_rows: int = 3
     date_override: str | None = None                     # data wspolna dla wszystkich przejazdow TSD (gdy brak jej w nazwie/pliku)
@@ -202,6 +221,8 @@ def build_n4_config(data: dict, base_dir=".") -> N4Config:
         for rule in g.antenna:
             if not isinstance(rule, dict) or not {"device", "d_m"} <= set(rule):
                 raise ConfigError("geometry.antenna: kazda regula to slownik z kluczami device, d_m [, era, confirmed, from, until]")
+        if g.lambda_est.apply and not g.lambda_est.enabled:
+            raise ConfigError("geometry.lambda_est.apply wymaga geometry.lambda_est.enabled: true")
         if g.sections.radius_m <= 0 or g.sections.min_matched_stations < 1:
             raise ConfigError("geometry.sections: radius_m > 0 oraz min_matched_stations >= 1")
         for name, rng in g.calib_intervals.items():

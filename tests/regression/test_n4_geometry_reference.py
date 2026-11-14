@@ -220,3 +220,61 @@ def test_detect_sections_reproduces_445_sections_of_v4(dbs):
     assert set(conf.direction) == {"same"} and set(conf.lane_class) == {"same", "adjacent"}
     eligible = ref[(ref.direction == "same") & ref.lane_class.isin(["same", "adjacent"])]
     assert len(eligible) == 167                                       # recall i precyzja wzgledem przegladu recznego: 167/167
+
+
+def test_lambda_estimator_reproduces_report_value(sql_root, dbs):
+    """T-N4-09: lambda d0 = 0,11787 z powtorzen: sigma_TSD 0,296408 (2015 par binow 10 m po s_ref, |dt| <= 1 d, poza betonem) i
+    sigma_FWD 0,101763 (128 par okien FWD od 2024) odtworzone z surowych tabel; wartosc = `e2b2_lambda.csv` (d0)."""
+    import math
+    from tsdfwd_tools.compare import lambda_est as LAM
+    b15 = sql_root / "bazy" / "baza_odcinki_b1510off_v2.db"
+    if not b15.is_file():
+        pytest.skip("brak baza_odcinki_b1510off_v2.db")
+    prod, v4 = dbs["prod"], dbs["v4"]
+    p = LAM.LambdaParams()
+    # --- FWD: stacje pasa 'same' z fwd_sref, D0 = srednia d1*50/F zrzutow nieosadczych, temperatura powierzchni mediana 3
+    dr = pd.read_sql("SELECT station_id, d1, force_kn FROM fwd_drops WHERE is_seating = 0", v4)
+    dr = dr[(dr.d1 > 0) & (dr.force_kn > 0)]
+    ld0 = (dr.d1 * 50.0 / dr.force_kn).groupby(dr.station_id).mean().map(math.log)
+    v4_path = v4.execute("PRAGMA database_list").fetchone()[2].replace("\\", "/")
+    prod.execute(f"ATTACH DATABASE 'file:{v4_path}?mode=ro' AS v4")
+    try:
+        meta = pd.read_sql("SELECT s.station_id, s.session_pk AS session, pp.device, pp.fwd_date AS date, s.in_concrete_zone AS conc "
+                           "FROM v4.fwd_stations s JOIN main.fwd_station_position pp ON pp.station_id = s.station_id", prod)
+    finally:
+        prod.execute("DETACH DATABASE v4")
+    st = pd.read_sql("SELECT f.station_id AS station, f.corridor_id AS corridor, f.s_ref AS s, t.surface_temp_med3 AS temp "
+                     "FROM fwd_sref f LEFT JOIN fwd_station_temp t ON t.station_id = f.station_id WHERE f.lane_match = 'same'", prod)
+    st = st[st.s.notna() & st.station.isin(ld0.index)].merge(meta, left_on="station", right_on="station_id")
+    st["ld0"] = st.station.map(ld0)
+    st["date"] = st["date"].astype(str).str[:10]
+    st["conc"] = st["conc"].fillna(0).astype(int)
+    fwd = LAM.fwd_repeat_sigma(st.reset_index(drop=True), p)
+    assert fwd["n_pairs"] == 128 and fwd["sigma_within"] == pytest.approx(0.101763, abs=1e-6)
+
+    # --- TSD: biny 10 m po s_ref (n >= 5), mediana d0 B_1510off, czas biny z tsd_bin_stats (jak e1_sref), pliki ok bez align_fail
+    rows = pd.read_sql("SELECT tsd_id, corridor_id, pass_id, s_ref FROM tsd_sref WHERE s_ref IS NOT NULL AND corridor_id IS NOT NULL "
+                       "AND pass_id IS NOT NULL", prod)
+    conn = sqlite3.connect(f"file:{b15.as_posix()}?mode=ro", uri=True)
+    d0 = pd.read_sql("SELECT tsd_id, d_d0 FROM b1510off_measurements", conn)
+    ok_files = {r[0] for r in conn.execute("SELECT f.file_id FROM b1510off_files f JOIN b1510off_alignment a ON a.file_id = f.file_id "
+                                           "WHERE f.status = 'ok' AND a.align_fail = 0")}
+    conn.close()
+    rows = rows.merge(d0, on="tsd_id", how="left").sort_values("pass_id", kind="stable")
+    pf = dict(prod.execute("SELECT pass_id, file_id FROM tsd_passes").fetchall())
+    pass_rows, dates, corr = {}, {}, {}
+    for pid, g in rows.groupby("pass_id", sort=True):
+        pass_rows[int(pid)] = dict(s=g.s_ref.to_numpy(float), d0=g.d_d0.to_numpy(float))
+        corr[int(pid)] = int(g.corridor_id.iloc[0])
+        dates[int(pid)] = "2025-01-01"                                  # zastapione ponizej czasem biny z tsd_bin_stats
+    bins = LAM.tsd_bin_table(pass_rows, dates, corr, p)
+    bstat = pd.read_sql("SELECT corridor_id, bin_id, pass_id, t_med, concrete_share FROM tsd_bin_stats", prod)
+    b = bins.drop(columns=["t_eff", "concrete_share"]).merge(bstat, on=["corridor_id", "bin_id", "pass_id"], how="left")
+    b["t_eff"] = b["t_med"]
+    b = b[b.pass_id.map(pf).isin(ok_files) & b.t_eff.notna()]
+    tsd = LAM.tsd_repeat_sigma(b, p)
+    assert tsd["n_pairs"] == 2015 and tsd["sigma"] == pytest.approx(0.296408, abs=1e-6)
+    ref = pd.read_sql("SELECT sigma_tsd, sigma_fwd, lambda_val, n_pairs_tsd, n_fwd_pairs FROM e2b2_lambda WHERE metric = 'd0'", dbs["e2b"]).iloc[0]
+    lam = LAM.lambda_from_sigmas(fwd["sigma_within"], tsd["sigma"])
+    assert lam == pytest.approx(ref.lambda_val, abs=1e-9) and lam == pytest.approx(0.11786960020790811, abs=1e-9)
+    assert tsd["n_pairs"] == ref.n_pairs_tsd and fwd["n_pairs"] == ref.n_fwd_pairs

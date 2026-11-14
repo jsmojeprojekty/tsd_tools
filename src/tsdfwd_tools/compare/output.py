@@ -17,7 +17,8 @@ TABLES = (("agreement", "agreement.csv"), ("groups", "agreement_groups.csv"), ("
           # tryb geometry: tabele posrednie (kandydaci na pary, polozenie plyty FWD, przejscia TSD, os, pary zerowe, sesje, ciagi)
           ("geo_pairs", "geometry_pairs.csv"), ("geo_fwd", "fwd_plate_positions.csv"), ("geo_passes", "tsd_passes.csv"),
           ("geo_corridors", "corridors.csv"), ("geo_nulls", "geometry_null_pairs.csv"),
-          ("geo_sessions", "fwd_sessions.csv"), ("geo_runs", "fwd_session_runs.csv"), ("geo_sections", "sections.csv"))
+          ("geo_sessions", "fwd_sessions.csv"), ("geo_runs", "fwd_session_runs.csv"), ("geo_sections", "sections.csv"),
+          ("lambda_estimate", "lambda_estimate.csv"))
 
 
 def _target(path: Path, overwrite: bool) -> Path:

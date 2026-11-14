@@ -64,7 +64,16 @@ arzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs
    (`session_id`, `run_id`, `status`: confirmed / rejected) i podaj w `geometry.sections.review_csv`. Raport pokazuje do 300 odcinkow
    (`report_max_sections`); pelna tabela: `sections.csv`.
 
-**Dodatkowe wyniki**: `sections.csv` (odcinki z miarami i statusem przegladu), `section_review.html`, `geometry_pairs.csv` (wszyscy kandydaci z warstwami i oknami), `fwd_plate_positions.csv` (polozenie plyty i `sigma_long` dla stacji),
+7. Opcjonalnie szacuje **lambde** (`geometry.lambda_est.enabled: true`): lambda = sigma_FWD² / sigma_TSD² na skali log, uzywana w regresji Deminga.
+   sigma_TSD to rozrzut roznic ln d0 miedzy przejazdami TSD z jednego dnia (|dt| <= 1 dzien) w tych samych binach 10 m korytarza (poza betonem;
+   bin pokryty, gdy >= 5 wierszy); sigma_FWD to rozrzut powtorzen D0 FWD miedzy sesjami tego samego aparatu w oknach 10 m (od 2024 r., |dT powierzchni|
+   < 3 C, poza betonem, poziom sesji usuniety). Estymator wymaga powtorzen: kilku przejazdow TSD tego samego dnia i kilku sesji FWD tego samego aparatu
+   na wspolnej drodze oraz kolumny `t_surface` (temperatura powierzchni z pirometru aparatu FWD). Bez czasu wiersza (`time` w wierszach TSD) czas przejazdu
+   to poludnie daty, wiec „|dt| <= 1 dzien” oznacza te sama lub sasiednia date. Wynik w `lambda_estimate.csv`; do analizy trafia dopiero po
+   `geometry.lambda_est.apply: true` (domyslnie analiza uzywa `measures.lambda_d0`, 0,11787 z raportu). Przy malej liczbie powtorzen oszacowanie jest
+   niepewne — sprawdz `n_pairs_tsd` i `n_pairs_fwd` w pliku wynikowym.
+
+**Dodatkowe wyniki**: `lambda_estimate.csv` (gdy wlaczony estymator), `sections.csv` (odcinki z miarami i statusem przegladu), `section_review.html`, `geometry_pairs.csv` (wszyscy kandydaci z warstwami i oknami), `fwd_plate_positions.csv` (polozenie plyty i `sigma_long` dla stacji),
 `tsd_passes.csv`, `corridors.csv`, `geometry_null_pairs.csv`, `fwd_sessions.csv` (kierunek i jednostka dystansomierza na sesje),
 `fwd_session_runs.csv` (ciagi stacji i dopasowanie dystansomierza). W `meta.json` sekcja `geometry` zawiera uzyte reguly anteny i `sigma_era`.
 
@@ -120,6 +129,7 @@ Opcje: `--dry-run`, `--out-dir`, `--log-level`, `--strict`. Obliczenia z `replic
   o −4,8 m (lag, +- 1,5 m): korekta jest wliczona raz, przy wyznaczaniu `s_ref` TSD; nie wolno jej dokladac drugi raz do okien.
 - Korelacja wewnatrz sesji par zerowych dla wariantu **bez korekty** nie jest w pelni odtwarzalna (inna definicja okna w skrypcie zrodlowym);
   test zostal oznaczony jako oczekiwane niepowodzenie (`xfail`) w testach pakietu — nie wplywa to na wyniki par skorygowanych.
-- Lambda (0,11787) jest przyjeta z raportu. Dla innych danych/aparatow powinna byc wyznaczona na nowo; narzedzie tego nie robi.
+- Lambda (0,11787) jest domyslnie przyjeta z raportu. Dla innych danych/aparatow mozna ja oszacowac (`geometry.lambda_est`, tylko tryb `geometry`);
+  w trybie `pairs` lambda pochodzi z konfiguracji.
 - Mnoznik przeliczenia opisuje zgodnosc na ocenianych odcinkach i aparatach; poza nimi (inna wersja rejestratora, inny przedzial
   kalibracji) trzeba go zweryfikowac.

@@ -30,6 +30,9 @@ geometry:
     review_csv: null              # decyzje recznego przegladu: session_id, run_id, status (confirmed / rejected)
     require_section: false        # true: do porownania tylko pary z odcinka wspolnego (bez odrzuconych)
     report_html: true             # section_review.html: slad GPS, monotonicznosc station_m, "linia do linii" d0/D0
+  lambda_est:                     # estymator lambdy z powtorzen (Q-N4-5): lambda = sigma_FWD^2 / sigma_TSD^2 (skala log)
+    enabled: false                # true: policz i zapisz lambda_estimate.csv; wymaga kolumny t_surface (pirometr FWD) i powtorzen
+    apply: false                  # true: uzyj oszacowania zamiast measures.lambda_d0 w miarach zgodnosci
   window_m: 5.0                   # polowka okna wartosci TSD (W5)
   min_rows: 3
 

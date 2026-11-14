@@ -24,6 +24,7 @@ from . import geo as G
 from . import fwd_position as FP
 from . import pairing as PA
 from . import sections as SEC
+from . import lambda_est as LAM
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +34,15 @@ def _read_csv(path, what: str) -> pd.DataFrame:
     if not p.is_file():
         raise FileNotFoundError(f"brak pliku {what}: {p}")
     return pd.read_csv(p, encoding="utf-8-sig")
+
+
+def _to_epoch(col: pd.Series) -> np.ndarray:
+    """Czas wiersza (liczba = sekundy epoki albo tekst ISO) -> sekundy epoki (czas lokalny zapisany jak UTC)."""
+    num = pd.to_numeric(col, errors="coerce")
+    if num.notna().mean() > 0.5:
+        return num.to_numpy(float)
+    dt = pd.to_datetime(col, errors="coerce")
+    return np.where(dt.isna(), np.nan, dt.astype("datetime64[s]").astype("int64").astype(float))
 
 
 def _run_name(path: Path) -> str:
@@ -61,7 +71,9 @@ def load_tsd_rows(cfg: N4Config) -> tuple[dict, dict]:
                 "d0": pd.to_numeric(sub[c.d0], errors="coerce").to_numpy(float),
                 "gof": pd.to_numeric(sub[c.gof], errors="coerce").to_numpy(float) if c.gof in sub else np.nan,
                 "t12": pd.to_numeric(sub[c.t12], errors="coerce").to_numpy(float) if c.t12 in sub else np.nan,
-                "speed": pd.to_numeric(sub[c.speed], errors="coerce").to_numpy(float) if c.speed in sub else np.nan})
+                "speed": pd.to_numeric(sub[c.speed], errors="coerce").to_numpy(float) if c.speed in sub else np.nan,
+                "t": _to_epoch(sub[c.time]) if c.time in sub else np.nan,
+                "conc": pd.to_numeric(sub[c.concrete], errors="coerce").fillna(0).to_numpy(float) if c.concrete in sub else 0.0})
             ch = out["chainage"].to_numpy()
             if np.isfinite(ch).sum() > 1 and not (np.diff(ch[np.isfinite(ch)]) >= 0).all():
                 raise ConfigError(f"przejazd {rid}: pikietaz ({c.chainage}) musi byc niemalejacy; podaj SUROWY pikietaz pliku, "
@@ -117,6 +129,7 @@ def load_stations(cfg: N4Config, files: dict) -> pd.DataFrame:
     out["heading_deg"] = pd.to_numeric(df[c.heading], errors="coerce") if c.heading in df else np.nan
     if c.in_concrete_zone in df:
         out["in_concrete_zone"] = df[c.in_concrete_zone]
+    out["t_surface"] = pd.to_numeric(df[c.t_surface], errors="coerce") if c.t_surface in df else np.nan
     for k in ("station_m", "lat", "lon", "fwd_d0", "fwd_t12"):
         out[k] = pd.to_numeric(out[k], errors="coerce")
     out["date"] = out["date"].astype(str).str[:10]
@@ -184,6 +197,31 @@ def detect_common_sections(cfg: N4Config, runs_df: dict, rtab: pd.DataFrame, sta
     return tab, matches, cnt, runs, sessions
 
 
+def estimate_lambda_from_inputs(cfg: N4Config, plate: pd.DataFrame, stations: pd.DataFrame, passes_df: pd.DataFrame, pass_rows: dict) -> dict:
+    """Estymator lambdy na danych trybu geometry: przejazdy TSD (biny korytarza po s_ref) i stacje FWD (okna po s_fwd)."""
+    le = cfg.geometry.lambda_est
+    params = LAM.LambdaParams(bin_m=le.bin_m, cover_min_n=le.cover_min_n, tsd_max_dt_days=le.tsd_max_dt_days,
+                              fwd_from_date=le.fwd_from_date, fwd_max_dtemp_c=le.fwd_max_dtemp_c,
+                              fwd_min_stations=le.fwd_min_stations, exclude_concrete=le.exclude_concrete)
+    if not stations["t_surface"].notna().any():
+        raise ConfigError("geometry.lambda_est: stacje FWD wymagaja kolumny temperatury powierzchni "
+                          f"({cfg.geometry.fwd_columns.t_surface!r}) - potrzebna do doboru par okien |dT| < {le.fwd_max_dtemp_c:g} C")
+    f = plate.drop(columns=["t_surface"], errors="ignore").merge(stations[["station_id", "t_surface"]], on="station_id", how="left")
+    f = f[(f["lane_match"] == "same") & f["s_fwd"].notna() & (f["fwd_d0"] > 0)]
+    conc = (pd.to_numeric(f["in_concrete_zone"], errors="coerce").fillna(0).astype(int) if "in_concrete_zone" in f
+            else pd.Series(0, index=f.index))
+    fw = pd.DataFrame({"station": f["station_id"].to_numpy(), "corridor": f["corridor_id"].to_numpy(), "s": f["s_fwd"].to_numpy(),
+                       "session": f["session_id"].to_numpy(), "device": f["device"].to_numpy(), "date": f["date"].astype(str).to_numpy(),
+                       "temp": f["t_surface"].to_numpy(float), "ld0": np.log(f["fwd_d0"].to_numpy(float)), "conc": conc.to_numpy()})
+    pdates = dict(zip(passes_df["pass_id"], passes_df["date"]))
+    pcorr = dict(zip(passes_df["pass_id"], passes_df["corridor_id"]))
+    res = LAM.estimate_lambda(pass_rows, pdates, pcorr, fw, params)
+    res["params"] = vars(params)
+    res["time_basis"] = ("czas wiersza" if any("t" in v for v in pass_rows.values()) else
+                         "data przejazdu (poludnie): |dt| <= 1 dzien = ta sama lub sasiednia data")
+    return res
+
+
 def build_geometry_pairs(cfg: N4Config) -> dict:
     """Zwraca slownik: pairs (DataFrame w formacie wejscia trybu pairs, nazwy znormalizowane), nulls (pair_id, null_type, d0_w5,
     d0_valid_w5), tabele pomocnicze (geo_pairs, geo_fwd, geo_passes, geo_corridors, geo_nulls), files i meta."""
@@ -224,6 +262,10 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
             ix = idx[order]
             pass_rows[pid] = dict(s=s[ix], tsd_id=ix.astype(np.int64), lat=lat[ix], gof=d["gof"].to_numpy()[ix],
                                   d0=d["d0"].to_numpy()[ix], t12=d["t12"].to_numpy()[ix])
+            if np.isfinite(d["t"].to_numpy()).any():
+                pass_rows[pid]["t"] = d["t"].to_numpy()[ix]
+            if d["conc"].to_numpy().any():
+                pass_rows[pid]["conc"] = d["conc"].to_numpy()[ix]
             speeds = d["speed"].to_numpy()[ix]
             passes.append(dict(pass_id=pid, file_id=rid, corridor_id=int(cc), date=rt.loc[rid, "date"],
                                v_med=float(np.nanmedian(speeds)) if np.isfinite(speeds).any() else None,
@@ -241,6 +283,11 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
         sec_tab, sec_matches, sec_cnt, sec_runs, sec_sessions = detect_common_sections(cfg, runs_df, rtab, stations, files)
         log.info("odcinki wspolne (Tab. 3.2): %d (odrzucone pary: %s)", len(sec_tab),
                  {k: v for k, v in sec_cnt.items() if k != "n_sections" and v})
+    lam_res = None
+    if g.lambda_est.enabled:
+        lam_res = estimate_lambda_from_inputs(cfg, plate, stations, passes_df, pass_rows)
+        log.info("lambda d0 (estymator): %.5f (sigma_TSD %.4f z %d par; sigma_FWD %.4f z %d par)", lam_res["lambda_d0"],
+                 lam_res["sigma_tsd"], lam_res["n_pairs_tsd"], lam_res["sigma_fwd"], lam_res["n_pairs_fwd"])
     cand = PA.build_candidates(plate, passes_df, pass_rows)
     if cand.empty:
         raise ConfigError("brak par kandydackich: stacje FWD nie leza na wspolnych korytarzach z przejazdami TSD "
@@ -306,14 +353,20 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
                              window_m=g.window_m, min_rows=g.min_rows),
                 lag_m=g.lag_m, eps_variant=g.eps_variant, sigma_era=ppar.sigma_era,
                 antenna_rules=[asdict(r) for r in ppar.rules],
+                lambda_estimate=lam_res,
                 layers_count={k: int(v) for k, v in cand["layer"].value_counts().items()},
                 sections=dict(enabled=g.sections.enabled, **{k: int(v) for k, v in sec_cnt.items()},
                               pairs_in_section=int(cand["in_section"].sum()) if "in_section" in cand else 0),
                 note=("s_ref = s_ref_gps (bez wyrownania profilem), bez scalania duplikatow pasa; okno wartosci TSD wg s_ref "
                       "(+-%g m, >= %d wierszy z waznym d0). Polozenie TSD skorygowane o lag %+g m (jedna stala globalna)."
                       % (g.window_m, g.min_rows, g.lag_m)))
-    return dict(pairs=pairs, nulls=nulls_out, files=files, meta=meta,
+    lam_tab = (pd.DataFrame([dict(metric="d0", lambda_d0=lam_res["lambda_d0"], sigma_tsd=lam_res["sigma_tsd"], sigma_fwd=lam_res["sigma_fwd"],
+                                  n_pairs_tsd=lam_res["n_pairs_tsd"], n_pairs_fwd=lam_res["n_pairs_fwd"],
+                                  n_session_pairs_fwd=lam_res["n_session_pairs_fwd"], median_diff_log_tsd=lam_res["median_diff_log_tsd"],
+                                  scale_m=lam_res["scale_m"], tsd_time_basis=lam_res["time_basis"],
+                                  used_in_analysis=bool(g.lambda_est.apply))]) if lam_res else None)
+    return dict(pairs=pairs, nulls=nulls_out, files=files, meta=meta, lambda_estimate=lam_res,
                 tables=dict(geo_pairs=cand, geo_fwd=plate, geo_passes=passes_df, geo_corridors=corr_tab,
-                            geo_nulls=nulls_all, geo_sessions=sessions, geo_runs=fwd_runs, geo_sections=sec_tab),
+                            geo_nulls=nulls_all, geo_sessions=sessions, geo_runs=fwd_runs, geo_sections=sec_tab, lambda_estimate=lam_tab),
                 section_report=(dict(sections=sec_tab, matches=sec_matches, runs=sec_runs, sessions=sec_sessions)
                                 if g.sections.enabled else None))
