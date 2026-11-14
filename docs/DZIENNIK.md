@@ -403,3 +403,9 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 - `SCI_SUB` nie jest liczone: w XML DSN zostaje pustym elementem `<SCI_SUB></SCI_SUB>` (element jest w ukladzie zalacznika H p. 4.2, wiec go nie usuwam; puste wartosci sa dozwolone jak `IRI_1`, `PROFIL_1`). Kolumna `a090` (calka 0-0,90 m) zostaje w CSV bez zmian. Pytanie Q-N3-12 (definicja SCI_SUB) jest zamkniete; na liscie otwartych punktow zostaja `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16.
 - Test `test_cli_n3_analytic_values_and_xml`: asercja SCI_SUB zmieniona na "pusty element".
 
+## 2026-11-14 — N3: decyzje Q-N3-14, Q-N3-15, Q-N3-16
+
+- Q-N3-14: kanoniczne nachylenia do calek P0 = eksport B_1510off (stan dotychczasowy, bez zmian). Q-N3-15: kilometraz z konfiguracji, data z nazwy pliku, godzina z `GPS time` — potwierdzone (bez zmian w kodzie).
+- Q-N3-16: `D_300` i `SCI_300` w XML liczone dla 0,31 m (polozenie czujnika; `SCI_300 = a031`, `D_300 = D_0 − a031`) i podawane jako 300. `D_200` i `SCI_200` bez zmian (0,20 m). Wartosci w XML zmienily sie tylko dla pol `SCI_300` i `D_300` (+0,01 m calki); test `test_cli_n3_analytic_values_and_xml` zaktualizowany.
+- Na liscie otwartych punktow zostaje wylacznie `UC_Schema.xsd`.
+

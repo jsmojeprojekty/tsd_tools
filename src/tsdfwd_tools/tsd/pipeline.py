@@ -200,7 +200,7 @@ def _bin_flags(agg: pd.DataFrame, range_c, gof_min: float) -> np.ndarray:
 
 def build_xml_records(cfg: N3Config, result: dict) -> pd.DataFrame:
     """Rekordy pola DSN `UC` (profil dsn_h42) z okien +-5 m co step_m: D_0 = d0_20 (mediana), D_x = D_0 - P0(x) (mediany),
-    SCI_200 = D_0 - D_200, SCI_300 = D_0 - D_300; SCI_SUB zostaje pustym elementem (decyzja Jacka: pole pomijane);
+    SCI_200 = D_0 - D_200 (calka 0-0,20 m), SCI_300 = D_0 - D_300 (calka 0-0,31 m, podawane jako 300); SCI_SUB zostaje pustym elementem (decyzja Jacka: pole pomijane);
     skala TSD (opcjonalnie FWD)."""
     x = cfg.xml_uc
     run, d, w = result["run"], result["rows"], result["windows"]
@@ -220,7 +220,7 @@ def build_xml_records(cfg: N3Config, result: dict) -> pd.DataFrame:
         if abs(pos[j2] - c) < abs(pos[j] - c):
             j = j2
         d0m = r["d0_20"]
-        sci200, sci300 = r["a020"], r["a030"]
+        sci200, sci300 = r["a020"], r["a031"]            # SCI_300 / D_300: calka 0-0,31 m (polozenie czujnika), podawana jako 300 (Q-N3-16)
         sec = d["gps_time_s"].iloc[j]
         godz = ""
         if np.isfinite(sec):

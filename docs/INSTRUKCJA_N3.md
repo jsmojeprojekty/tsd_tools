@@ -65,7 +65,7 @@ W `output.dir`, dla pliku `<nazwa>.raw.sup.txt` (nazwa = czesc przed pierwsza kr
 ### Plik XML (profil `dsn_h42`, 21 pol)
 Kolejnosc pol jak w zalaczniku H p. 4.2: `KM, DYSTANS, DROGA, JEZDNIA, PAS, LAT, LON, DATA, GODZ, IRI_1, PROFIL_1, PREDKOSC, STRAIN_GAUGE,
 T_DROGI, T_POW, SCI_200, SCI_300, SCI_SUB, D_0, D_200, D_300`. Znaczenie: `D_0` = mediana D0 po korekcie do 20 C; `D_x = D_0 − P0(x)`;
-`SCI_200 = D_0 − D_200`, `SCI_300 = D_0 − D_300`; `SCI_SUB` jest **pustym elementem** (pole pomijane — decyzja Jacka); `T_DROGI`, `T_POW` = odczyty temperatur z eksportu TSD (nie temperatura warstwy).
+`SCI_200 = D_0 − D_200` (calka 0–0,20 m), `SCI_300 = D_0 − D_300` (calka 0–0,31 m, czyli do polozenia czujnika, podawana jako 300); `SCI_SUB` jest **pustym elementem** (pole pomijane — decyzja Jacka); `T_DROGI`, `T_POW` = odczyty temperatur z eksportu TSD (nie temperatura warstwy).
 `IRI_1` i `PROFIL_1` sa puste (eksport B_1510off nie zawiera tych kanalow). Brak wartosci to pusty element, nigdy `nan`.
 Plik: UTF-8 bez BOM, konce linii LF. Struktura jest sprawdzana wewnetrznie; **walidacja wzgledem `UC_Schema.xsd` zostanie dodana po
 dostarczeniu schematu** — do tego czasu plik trzeba traktowac jako zgodny z opisem z zalacznika H, ale niezweryfikowany schematem.
@@ -82,7 +82,7 @@ GoF jest atrybutem, nie filtrem), `GPS_INVALID`, `FILE_NOT_RECALIBRATED` (pusty 
   Mieszanie wersji bez korekty zmienia D0 o rzad wielkosci i wyklucza analize temperaturowa.
 - Wyniki sa w **skali TSD**. Przeliczenie na skale FWD (mnoznik 1,62) jest opcjonalne, wazne dla wartosci odcinkowych (>= 100 m)
   i nie zastepuje porownania w N4.
-- `D_300` jest liczone dla 0,30 m (nie 0,31 m, polozenia czujnika).
+- `D_300` i `SCI_300` w XML liczone sa dla 0,31 m (polozenie czujnika) i podawane jako 300 (decyzja Jacka); `D_200` i `SCI_200` dla 0,20 m.
 - KM: eksport nie zawiera znacznikow kilometrazu; `KM = km_start + znak x pikietaz/1000` z konfiguracji. Data pochodzi z nazwy pliku,
   godzina z `GPS time` — sprawdzic na pierwszym pliku (Q-N3-15).
 - Temperatura warstwy 12 cm pochodzi z modelu N2 (RMSE 1,75 C na zbiorze eksploracyjnym, 2,73 C na niezaleznym) — blad temperatury
