@@ -98,7 +98,10 @@ def process_file(cfg: N1Config, path: Path, stations_path: Path | None) -> FileR
     d_stat = geo.loc[stations["station_id"]].reset_index(drop=True)
     cor = correct_deflections(d_stat, temp.to_numpy(), variant=c.variant, coefficient_set=c.coefficient_set,
                               road_type=c.road_type, ranges_c=c.ranges_c, indices_max_c=c.indices_max_c,
-                              t_ref=c.t_ref_c)
+                              t_ref=c.t_ref_c,
+                              coefficients_file=(resolve_path(c.coefficients_file, cfg.base_dir)
+                                                 if c.coefficients_file else None),
+                              coefficients_scope=c.coefficients_scope)
 
     force = norm["force_kn"].loc[stations["station_id"]].to_numpy(dtype=float)
     mask = cor.flag_mask.to_numpy(dtype=np.int64).copy()

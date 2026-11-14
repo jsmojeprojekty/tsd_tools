@@ -17,6 +17,13 @@ C:\ENV\narzedzia_tsd_fwd\python.exe -m tsdfwd_tools fwd_tempcorr --config config
 ```
 Opcje: `--dry-run` (bez zapisu), `--out-dir`, `--log-level`, `--strict` (kod 2 przy braku/niewaznej temperaturze).
 
+## Dopasowanie wspolczynnikow z wlasnych wizyt (opcjonalnie)
+```bash
+C:\ENV
+arzedzia_tsd_fwd\python.exe -m tsdfwd_tools fwd_fit --config configswd_fit_example.yaml
+```
+Wynik (`*_coefficients.csv`, format jak `e2a3_final_k_profile.csv`) mozna uzyc w N1: `coefficient_set: file`.
+
 ## Testy
 ```bash
 C:\ENV\narzedzia_tsd_fwd\python.exe -m pytest tests            # jednostkowe i regresji (@reference pomijane bez tests\local_paths.yaml)

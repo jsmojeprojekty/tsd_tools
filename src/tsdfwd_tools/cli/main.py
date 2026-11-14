@@ -14,6 +14,7 @@ from ..common.logging_setup import setup_logging
 
 TOOLS = {
     "fwd_tempcorr": "n1", "n1": "n1",
+    "fwd_fit": "fit", "n1fit": "fit",
     "layer_temp": "n2", "n2": "n2",
     "tsd_network": "n3", "n3": "n3",
     "tsd_fwd_compare": "n4", "n4": "n4",
@@ -37,6 +38,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     tool = TOOLS[args.tool]
+    if tool == "fit":
+        return _main_fit(args)
     if tool != "n1":
         print(f"narzedzie {args.tool} nie jest jeszcze zaimplementowane (kolejne etapy)", file=sys.stderr)
         return 1
@@ -61,6 +64,25 @@ def main(argv=None) -> int:
         critical = int(Flag.T_MISSING | Flag.T_BELOW_5C)
         if any((fr.table["flags"].to_numpy() & critical).any() for fr in result.files):
             return 2
+    return 0
+
+
+def _main_fit(args) -> int:
+    from ..common.config_fit import load_fit_config
+    from ..fwd.fit_pipeline import run_fit
+    try:
+        cfg = load_fit_config(args.config)
+        if args.out_dir:
+            cfg.output.dir = args.out_dir
+        setup_logging(args.log_level or cfg.log_level)
+        result = run_fit(cfg, dry_run=args.dry_run)
+    except (ConfigError, FileNotFoundError, ValueError, KeyError, RuntimeError) as exc:
+        print(f"BLAD: {exc}", file=sys.stderr)
+        return 1
+    log = logging.getLogger("tsdfwd")
+    log.info("dopasowano %d wskaznikow na %d wizytach", len(result["table"]), result["n_visits"])
+    for p in result["outputs"]:
+        log.info("zapisano %s", p)
     return 0
 
 

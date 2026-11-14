@@ -30,9 +30,16 @@ class CorrectedDeflections:
     meta: dict = field(default_factory=dict)
 
 
+def _table(coefficient_set, coefficients_file, coefficients_scope):
+    if coefficient_set == "file":
+        return load_coefficients("file", coefficients_scope, path=coefficients_file)
+    return load_coefficients(coefficient_set)
+
+
 def correct_deflections(d_um: pd.DataFrame, temp_c, variant: str = "B", coefficient_set: str = "e2a3_full",
                         road_type: str = "public", ranges_c: dict | None = None,
-                        indices_max_c: float = INDICES_MAX_C, t_ref: float = T_REF_C) -> CorrectedDeflections:
+                        indices_max_c: float = INDICES_MAX_C, t_ref: float = T_REF_C,
+                        coefficients_file=None, coefficients_scope: str | None = None) -> CorrectedDeflections:
     """d_um: ugiecia [um] znormalizowane do sily odniesienia, kolumny D0..D1800; temp_c: temperatura T_mid [C]
     (Series o tym samym indeksie lub skalar)."""
     if variant not in ("A", "B", "legacy"):
@@ -44,9 +51,9 @@ def correct_deflections(d_um: pd.DataFrame, temp_c, variant: str = "B", coeffici
     if variant == "legacy":
         table, form = legacy_table(road_type), CorrectionForm.LINEAR
     elif variant == "A":
-        table, form = load_coefficients(coefficient_set), CorrectionForm.LINEAR
+        table, form = _table(coefficient_set, coefficients_file, coefficients_scope), CorrectionForm.LINEAR
     else:
-        table, form = load_coefficients(coefficient_set), CorrectionForm.EXPONENTIAL
+        table, form = _table(coefficient_set, coefficients_file, coefficients_scope), CorrectionForm.EXPONENTIAL
 
     t = temp.to_numpy(dtype=float)
     finite = np.isfinite(t)

@@ -1,0 +1,19 @@
+# Dopasowanie wspolczynnikow k i beta z wlasnych wizyt (opcjonalny modul N1).
+# Wejscie: CSV/XLSX, jedna wizyta = jeden wiersz; kolumny punktu, daty (RRRR-MM-DD), T_mid i wskaznikow (D0..D1800, SCI300, BDI, BCI).
+tool: fwd_fit
+schema_version: 1
+input:
+  visits: "../wizyty.csv"
+  point_col: point_code
+  date_col: date
+  t_col: t_mid_met
+  exclude_if_true: [excl_frost]     # np. wizyty w okresie mrozu
+  require_true: [has_met]           # tylko wizyty z temperatura z czujnikow
+fit:
+  t_range_c: [5, 30]                # wizyty 5 <= T < 30 C
+  n_boot: 500
+  scope_label: lacznie
+output:
+  dir: "../wyniki/fwd_fit_example"
+  overwrite: true
+# Uzycie wyniku w N1: correction: {coefficient_set: file, coefficients_file: <plik>_coefficients.csv, coefficients_scope: lacznie}

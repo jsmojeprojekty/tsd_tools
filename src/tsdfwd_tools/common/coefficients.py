@@ -8,7 +8,7 @@ from importlib import resources
 
 from .constants import GEOPHONES, LEGACY_K
 
-COEFFICIENT_SETS = ("e2a3_full", "tab71")
+COEFFICIENT_SETS = ("e2a3_full", "tab71", "file")
 
 
 @dataclass(frozen=True)
@@ -40,7 +40,39 @@ def _read_csv(filename: str) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
-def load_coefficients(set_name: str = "e2a3_full", scope: str = "lacznie") -> CoefficientTable:
+def _table_from_rows(rows: list, name: str, meta: dict) -> CoefficientTable:
+    k = {r["indicator"]: float(r["k_guide"]) for r in rows}
+    beta = {r["indicator"]: float(r["beta_pct"]) / 100.0 for r in rows}
+    missing = [g for g in GEOPHONES if g not in k]
+    if missing:
+        raise ValueError(f"zestaw {name!r} nie zawiera czujnikow: {missing}")
+    return CoefficientTable(name=name, _k=k, _beta=beta, meta=meta)
+
+
+def load_coefficients_file(path, scope: str | None = None) -> CoefficientTable:
+    """Wlasny plik wspolczynnikow (np. wynik modulu fit): CSV z kolumnami indicator, beta_pct [%/C], k_guide [1/C]
+    i opcjonalnie scope (jak e2a3_final_k_profile.csv). Gdy plik zawiera kilka zbiorow, scope jest wymagany."""
+    with open(path, "r", encoding="utf-8-sig", newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    if not rows:
+        raise ValueError(f"pusty plik wspolczynnikow: {path}")
+    needed = {"indicator", "beta_pct", "k_guide"}
+    if not needed <= set(rows[0]):
+        raise ValueError(f"{path}: wymagane kolumny {sorted(needed)}")
+    if "scope" in rows[0]:
+        scopes = sorted({r["scope"] for r in rows})
+        if scope is None:
+            if len(scopes) != 1:
+                raise ValueError(f"{path}: plik zawiera zbiory {scopes}; podaj coefficients_scope")
+            scope = scopes[0]
+        rows = [r for r in rows if r["scope"] == scope]
+        if not rows:
+            raise ValueError(f"{path}: brak zbioru {scope!r} (dostepne: {scopes})")
+    meta = {"set": f"file:{scope}" if scope else "file", "source": str(path), "scope": scope}
+    return _table_from_rows(rows, f"file:{scope or 'all'}", meta)
+
+
+def load_coefficients(set_name: str = "e2a3_full", scope: str = "lacznie", path=None) -> CoefficientTable:
     """Wczytuje zestaw wspolczynnikow z danych pakietu.
 
     e2a3_full: pelna precyzja z e2a3_final_k_profile.csv (dopasowanie 5 <= T < 30 C, T_mid z czujnikow), zbior `scope`.
@@ -62,6 +94,10 @@ def load_coefficients(set_name: str = "e2a3_full", scope: str = "lacznie") -> Co
         k = {r["indicator"]: float(r["k"]) for r in rows}
         beta = {r["indicator"]: float(r["beta_pct"]) / 100.0 for r in rows}
         meta = {"set": set_name, "source": "raport PW.S-1063 v1.12, Tab. 7.1 (wartosci zaokraglone)"}
+    elif set_name == "file":
+        if path is None:
+            raise ValueError("zestaw 'file' wymaga sciezki do pliku wspolczynnikow")
+        return load_coefficients_file(path, scope)
     else:
         raise ValueError(f"nieznany zestaw wspolczynnikow: {set_name!r} (dozwolone: {', '.join(COEFFICIENT_SETS)})")
     missing = [g for g in GEOPHONES if g not in k]

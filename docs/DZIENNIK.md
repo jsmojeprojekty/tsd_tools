@@ -116,3 +116,23 @@ Test `T-N1-07` (estymatory `qp_fit_nd` / `fit_k_profile` na `e2a3_visits`) NIE w
 **Co zostaje:** modul `fit` (opcjonalnie), instrukcja N1 (E5), E2 (N4: tryb `pairs`).
 
 **STOP — decyzja:** brak decyzji blokujacych E2; do potwierdzenia: czy dodac opcjonalny modul `fit` (wlasne k/beta z danych uzytkownika) do N1 teraz, czy odlozyc.
+
+## 2026-11-14 — E1 (uzupelnienie): modul `fit` (opcjonalny, N1)
+
+**Co zrobiono**
+- `fwd/fit.py` (zrodlo: `e2a2b_beta.py` — `_prep_groups`, `qp_fit_nd`, `bootstrap_draws`; `e2a3_beta.py` — `fit_k_profile`; `e2a3i_final.py` — `get_data`, `beta_with_ci`, `run_k_profile`; `e2a3e_range.py` — `seed_for`; stan c67f7fe): log-link (quasi-Poisson) z efektem stalym punkt x miesiac, postac liniowa (WLS + minimalizacja RSS), bootstrap blokowy po dniach (percentyle 2,5/97,5, seed crc32).
+- Nowe narzedzie `fwd_fit` (alias `n1fit`): CSV/XLSX z wizytami -> `*_coefficients.csv` (format `e2a3_final_k_profile.csv`) + `*_meta.json`. `configs\fwd_fit_example.yaml`.
+- N1: `correction.coefficient_set: file` + `coefficients_file`, `coefficients_scope` — korekta wlasnymi wspolczynnikami (np. z `fwd_fit`).
+
+**Co sprawdzono (T-N1-07; 87 testow zielonych: 59 + 10 jednostkowych fit/N1-file + 18 regresji)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| beta_pct, 12 wskaznikow (D0..D1800, SCI300, BDI, BCI), scope lacznie, n = 414 | zgodne z `e2a3_final_k_profile.csv` | max 4,7e-6 %/C (tolerancja 5e-5) | OK |
+| k_guide, 12 wskaznikow | zgodne | max 4,3e-8 (tolerancja 3e-6) | OK |
+| D0 beta 1,60415 / SCI300 3,24407 / BDI 2,8704 / BCI 1,92233 %/C | 1,60415 / 3,24407 / 2,8704 / 1,92233 | <= 5e-5 | OK |
+| przedzial beta D0 (bootstrap 500 replik, seed crc32): [1,51323; 1,72669] | [1,51323; 1,72669] (D0); wszystkie wskazniki: max roznica 0,0023 pp | tolerancja 0,01 pp | OK |
+Testy jednostkowe: odtworzenie znanej beta (0,016 i 0,012, efekt grupy), deterministycznosc seedu, za malo danych, filtry zakresu, przekazanie pliku wspolczynnikow do N1 (np. beta 2 %/C, T = 18 C -> exp(0,04)).
+
+**Uwagi:** przedzialy ufnosci odtwarzaja sie dokladnie tylko przy tej samej wersji numpy/scipy (solver `root`); w tescie tolerancja 0,01 pp. Wspolczynniki SCI300/BDI/BCI z `fit` maja charakter diagnostyczny — nie sa uzywane do korekty (zasada metodyczna). Zrodla nie zmienione (kontrola `find -newermt`).
+
+**STOP — decyzja:** brak; nastepny krok E2 (N4, tryb `pairs`).

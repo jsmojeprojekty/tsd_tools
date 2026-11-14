@@ -46,7 +46,9 @@ class N1Temperature:
 @dataclass
 class N1Correction:
     variant: str = "B"                    # A | B | legacy
-    coefficient_set: str = "e2a3_full"    # e2a3_full | tab71
+    coefficient_set: str = "e2a3_full"    # e2a3_full | tab71 | file (wlasny plik, np. wynik fwd_fit)
+    coefficients_file: str | None = None  # wymagane przy coefficient_set: file
+    coefficients_scope: str | None = None # zbior w pliku (kolumna scope), np. lacznie
     road_type: str = "public"             # public | highway (tylko variant: legacy)
     ranges_c: dict = field(default_factory=lambda: {
         "A": list(RANGE_A_C), "B": list(RANGE_B_C), "legacy": list(RANGE_LEGACY_C)})
@@ -137,7 +139,9 @@ def _validate_n1(cfg: N1Config) -> None:
     _choice(cfg.input.geophone_mapping, ("by_x", "standard_layout"), "input.geophone_mapping")
     _choice(cfg.temperature.source, ("column", "constant", "csv_join"), "temperature.source")
     _choice(cfg.correction.variant, ("A", "B", "legacy"), "correction.variant")
-    _choice(cfg.correction.coefficient_set, ("e2a3_full", "tab71"), "correction.coefficient_set")
+    _choice(cfg.correction.coefficient_set, ("e2a3_full", "tab71", "file"), "correction.coefficient_set")
+    if cfg.correction.coefficient_set == "file" and not cfg.correction.coefficients_file:
+        raise ConfigError("correction.coefficients_file jest wymagane przy coefficient_set: file")
     _choice(cfg.correction.road_type, ("public", "highway"), "correction.road_type")
     for fmt in cfg.output.formats:
         _choice(fmt, ("csv", "xlsx"), "output.formats")
