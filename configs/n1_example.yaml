@@ -1,0 +1,19 @@
+tool: fwd_tempcorr
+schema_version: 1
+log_level: INFO
+input:
+  files: ["../tests/data/Drops50_1M_1.xlsx"]
+  stations_files: ["../tests/data/stations50_1M_1.xlsx"]
+  format: auto
+  drop_rule: mean_nonseating
+temperature:
+  source: column
+  column: asphalt_temp
+  depth_cm: 12
+correction:
+  variant: B
+  coefficient_set: e2a3_full
+output:
+  dir: "../wyniki/n1_example"
+  formats: [csv]
+  overwrite: true

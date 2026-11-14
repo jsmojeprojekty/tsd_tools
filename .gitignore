@@ -5,3 +5,6 @@ __pycache__/
 .idea/
 .vscode/
 tests/local_paths.yaml
+wyniki/
+*.egg-info/
+.pytest_cache/

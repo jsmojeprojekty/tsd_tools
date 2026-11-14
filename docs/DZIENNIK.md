@@ -78,3 +78,41 @@ Jacek przeszedl po kolei wszystkie pytania; zapis: `docs\PROJEKT.md` sekcja 8.0.
 Uwaga: w pytaniu Q-N4-1 w opisie opcji pomylkowo zapisalem "-1200 m"; chodzi o pary zerowe -200 m / +200 m / permutacja (tresc w PROJEKT.md poprawna).
 
 Otwarte do E2/E3: Q-N4-3 (offset -4,8 m), dostarczenie `UC_Schema.xsd` i potwierdzenie `SCI_SUB`.
+
+## 2026-11-14 — E1: szkielet pakietu + N1 `fwd_tempcorr`
+
+**Co zrobiono**
+- Srodowisko `C:\ENV\narzedzia_tsd_fwd` (conda, Python 3.11; numpy 2.4.6, pandas 3.1.1, scipy 1.17.1, xlrd, openpyxl, pyodbc, pytest), `pyproject.toml`, `requirements.txt`, `README.md`.
+- Pakiet `src\tsdfwd_tools`: `common` (stale, config YAML ze scisla walidacja kluczy, `rules` z enumem `CorrectionForm` — bez cichego przejscia na postac wykladnicza, `coefficients`, `flags`), `data` (kopia `e2a3_final_k_profile.csv` MD5 `ac5f657401c75b81d67b74ace4fbb7b0`, `tab71.csv`, `PROVENANCE.md`), `fwd` (`io`: XLSX Drops/Stations, MDB przez pyodbc ReadOnly, CSV; `normalize`; `quality`; `tempcorr`; `indices`; `diagnostics`; `pipeline`; `output`), `cli` (`python -m tsdfwd_tools fwd_tempcorr --config ...`, `--dry-run`, `--strict`).
+- Decyzje z E0 wdrozone: wspolczynniki pelnej precyzji (`tab71` jako opcja), `T_mid` z kolumny pliku / csv / stala, bez interpolacji, regula `mean_nonseating`, tryb `legacy` (k=0,02 / k=0,01 wg `road_type`), wskazniki > 25 C liczone i flagowane (`INDEX_ABOVE_RANGE`), T < 5 C: korekta bez zastosowania (D*_20 puste, `T_BELOW_5C`), czytnik MDB w E1.
+- Kod przeniesiony ze zrodel (naglowki `zrodlo: <sciezka>, stan c67f7fe / data`): `apply_rule`/`apply_f` (rules), `classify_session`/`placeholder_runs` (quality), `load_fwd_values` (normalize), `l20_error`/`band_mean` (diagnostics).
+
+**Co sprawdzono (testy; 67 zielonych: 59 jednostkowych + 8 regresji @reference)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| D0 k 0,0161092 / beta 1,60415 %/C | 0,0161092 / 1,60415 | 0 | OK |
+| D300 0,0123428 / 1,21602 | 0,0123428 / 1,21602 | 0 | OK |
+| D900 0,00328817 / 0,333874 | 0,00328817 / 0,333874 | 0 | OK |
+| CSV pakietu = CSV zrodla | MD5 identyczne | 0 | OK |
+| `apply_rule` zrodla vs pakiet (linear/exp, 5 wspolczynnikow, 200 losowych) | zgodne | <= 1e-9 | OK |
+| R4 pasma, D0 (lacznie, no_thaw): 15-20 / 20-25 / 25-30 / 30-35 | -0,224 / +0,220 / -1,064 / -3,762 % (n 108/110/49/25) | <= 0,001 pp | OK |
+| R4 pasma, D300 | -0,089 / +0,087 / -0,231 / -1,358 % | <= 0,001 pp | OK |
+| R4 pasma, D900 | +0,131 / -0,129 / +0,563 / +0,368 % | <= 0,001 pp | OK |
+| R4 SCI300 z ugiec skorygowanych (n 108/110/49/24) | -0,683 / +0,671 / -6,021 / -18,525 % | <= 0,001 pp | OK |
+| Wzory: D0=200, T=10: A 232,000 / B 234,702; T=5: 248,000 / 254,250; T=30: 168,000 / 170,429 | zgodne | <= 1e-3 | OK |
+| SCI300_20 (D0=200, D300=150, T=10): A 64,000 / B 65,239 | zgodne | <= 1e-3 | OK |
+| Stacje bez referencji ponizej 10 C | `keep` puste dla T < 10 C | — | OK |
+| Odczyt MDB (MOP_Kepinica.mdb, tylko odczyt): 10 stacji, D0 po normalizacji 50 kN, uklad geofonow po x1..x9 | zgodne z obliczeniem recznym | <= 1e-3 | OK |
+| Potok XLSX (DK50 50_1M, 121 stacji, T=18 C): D0 st. 1 = 171,087; D0_20 = 176,665 (= exp(0,0160415*2)) | zgodne | <= 1e-3 | OK |
+Test `T-N1-07` (estymatory `qp_fit_nd` / `fit_k_profile` na `e2a3_visits`) NIE wykonany — modul `fit` jest poza zakresem E1 (nie byl wymagany w prompcie; zapisane jako opcja, wymaga decyzji).
+
+**Uwagi i decyzje implementacyjne (bez zmiany metod)**
+- Kolumny wyjsciowe: `D0..D1800`, `D0_20..D1800_20`, `SCI300_20`, `BDI_20`, `BCI_20` (wielkie litery, w PROJEKT.md bylo `d0..`), plus `flags`, `flags_text`, `t_status`, `t_age_min`, `t_source`.
+- `T_ABOVE_RANGE`: korekta wykonana i oznaczona; `T_BELOW_5C`: korekta niewykonana (zgodnie z raportem: stan podloza).
+- W przykladowym pliku DK50 temperatura asfaltu jest wpisana raz (18 C) i przenoszona — 99 % stacji ma flage `T_CARRIED`, 50 % `T_STALE` (> 60 min); to oczekiwane zachowanie regul jakosci, nie blad.
+- Granice zakresu: dopasowania (modul zrodlowy) `5 <= T < 30`, flagi zakresu waznosci domkniete `[5, 25]` / `[5, 30]` (S-N1-2 ujednolicone w PROJEKT 4.1).
+- Integralnosc zrodel: brak plikow zmienionych w `sql_tsd_fwd` i `DOKTORAT` po 2026-11-14 00:00 (`find -newermt`); bazy otwierano `mode=ro` / ODBC `ReadOnly=1`.
+
+**Co zostaje:** modul `fit` (opcjonalnie), instrukcja N1 (E5), E2 (N4: tryb `pairs`).
+
+**STOP — decyzja:** brak decyzji blokujacych E2; do potwierdzenia: czy dodac opcjonalny modul `fit` (wlasne k/beta z danych uzytkownika) do N1 teraz, czy odlozyc.

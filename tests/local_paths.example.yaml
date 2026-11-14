@@ -1,0 +1,3 @@
+# Skopiuj do tests/local_paths.yaml (plik poza git) i ustaw sciezki; dane sa tylko czytane.
+sql_tsd_fwd_root: "C:/projects/sql_tsd_fwd"
+doktorat_root: "C:/WORK/DOKTORAT"
