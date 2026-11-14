@@ -200,7 +200,8 @@ def _bin_flags(agg: pd.DataFrame, range_c, gof_min: float) -> np.ndarray:
 
 def build_xml_records(cfg: N3Config, result: dict) -> pd.DataFrame:
     """Rekordy pola DSN `UC` (profil dsn_h42) z okien +-5 m co step_m: D_0 = d0_20 (mediana), D_x = D_0 - P0(x) (mediany),
-    SCI_200 = D_0 - D_200, SCI_300 = D_0 - D_300, SCI_SUB = D_0 - D_900; skala TSD (opcjonalnie FWD)."""
+    SCI_200 = D_0 - D_200, SCI_300 = D_0 - D_300; SCI_SUB zostaje pustym elementem (decyzja Jacka: pole pomijane);
+    skala TSD (opcjonalnie FWD)."""
     x = cfg.xml_uc
     run, d, w = result["run"], result["rows"], result["windows"]
     date = x.date_override or (run.date.isoformat() if run.date else None)
@@ -219,7 +220,7 @@ def build_xml_records(cfg: N3Config, result: dict) -> pd.DataFrame:
         if abs(pos[j2] - c) < abs(pos[j] - c):
             j = j2
         d0m = r["d0_20"]
-        sci200, sci300, sci_sub = r["a020"], r["a030"], r["a090"]
+        sci200, sci300 = r["a020"], r["a030"]
         sec = d["gps_time_s"].iloc[j]
         godz = ""
         if np.isfinite(sec):
@@ -230,7 +231,7 @@ def build_xml_records(cfg: N3Config, result: dict) -> pd.DataFrame:
             "DYSTANS": int(round(c)), "DROGA": str(x.droga), "JEZDNIA": x.jezdnia, "PAS": x.pas,
             "LAT": d["lat"].iloc[j], "LON": d["lon"].iloc[j], "DATA": date, "GODZ": godz, "IRI_1": None, "PROFIL_1": None,
             "PREDKOSC": r["speed_kmh"], "STRAIN_GAUGE": r["strain_right_kg"], "T_DROGI": r["temp_road"], "T_POW": r["temp_air"],
-            "SCI_200": sci200 * mult, "SCI_300": sci300 * mult, "SCI_SUB": sci_sub * mult,
+            "SCI_200": sci200 * mult, "SCI_300": sci300 * mult, "SCI_SUB": None,
             "D_0": d0m * mult, "D_200": (d0m - sci200) * mult, "D_300": (d0m - sci300) * mult,
         })
     return pd.DataFrame(recs)

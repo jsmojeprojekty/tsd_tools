@@ -398,3 +398,8 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 
 **STOP — decyzja:** brak decyzji blokujacych.
 
+## 2026-11-14 — SCI_SUB pomijane (decyzja Jacka)
+
+- `SCI_SUB` nie jest liczone: w XML DSN zostaje pustym elementem `<SCI_SUB></SCI_SUB>` (element jest w ukladzie zalacznika H p. 4.2, wiec go nie usuwam; puste wartosci sa dozwolone jak `IRI_1`, `PROFIL_1`). Kolumna `a090` (calka 0-0,90 m) zostaje w CSV bez zmian. Pytanie Q-N3-12 (definicja SCI_SUB) jest zamkniete; na liscie otwartych punktow zostaja `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16.
+- Test `test_cli_n3_analytic_values_and_xml`: asercja SCI_SUB zmieniona na "pusty element".
+

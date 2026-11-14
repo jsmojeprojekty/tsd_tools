@@ -296,7 +296,7 @@ def test_cli_n3_analytic_values_and_xml(tmp_path, make_tsd):
     assert d0m == pytest.approx(180.0 * math.exp(beta * 5.0), rel=0.02)                  # d0 skorygowane do 20 C (T12 = 15 C)
     assert float(recs[5]["SCI_200"]) == pytest.approx(a * 0.2 ** 2 / 2, abs=1e-2)          # P0(0,2) = a*x^2/2
     assert float(recs[5]["SCI_300"]) == pytest.approx(a * 0.3 ** 2 / 2, abs=1e-2)
-    assert float(recs[5]["SCI_SUB"]) == pytest.approx(a * 0.9 ** 2 / 2, abs=1e-2)
+    assert recs[5]["SCI_SUB"] is None                                                       # SCI_SUB pomijane: pusty element
     assert float(recs[5]["D_200"]) == pytest.approx(d0m - float(recs[5]["SCI_200"]), abs=2e-3)
     assert float(recs[5]["D_300"]) == pytest.approx(d0m - float(recs[5]["SCI_300"]), abs=2e-3)
     assert recs[0]["KM"] == "40.010" and recs[0]["GODZ"] == "10:16:50" and recs[0]["IRI_1"] is None
