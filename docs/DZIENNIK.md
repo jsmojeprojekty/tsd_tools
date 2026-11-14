@@ -66,3 +66,15 @@ Praca zatrzymana po E0 zgodnie z promptem. Do decyzji (pelna lista: `docs\PROJEK
 - Wyciag z zalacznika: `docs\notatki_E0\DSN_zal_H_4_1_UP_4_2_UC.txt`.
 
 **STOP — decyzja:** odpowiedzi na pytania z `docs\PROJEKT.md` sekcja 8 (w szczegolnosci Q-N1-1, Q-N1-3, Q-N1-5, Q-N1-6/7, Q-N3-12).
+
+## 2026-11-14 — E0: decyzje Jacka (pytania z PROJEKT.md sekcja 8)
+
+Jacek przeszedl po kolei wszystkie pytania; zapis: `docs\PROJEKT.md` sekcja 8.0. Skrot:
+- N1: pelna precyzja `e2a3`; `T_mid` od uzytkownika; srednia zrzutow nieosadczych; tryb legacy `k=0,02` oraz dla autostrad `k=0,01` (`road_type`); wskazniki > 25 C liczone i flagowane; czytnik MDB w E1 (testy bez MDB); bez eksportu `UP` w E1.
+- N4: `xfail` dla r par zerowych; antena P043b; sprawdzenie offsetu -4,8 m w E2; najpierw `pairs`, potem E2b `geometry`; lambda 0,11787 z konfiguracji; `calib_interval` + `device`; T12 z Z15 (E2) / z N2.
+- N3: profil `dsn_h42`; Hampel jak `tsd_pipeline` po korekcie; pikietaz jak w produkcji; stale XML wymagane w konfiguracji; pliki problemowe flagowane; P0 bez korekty; "D Tkor" = BELLS3_BT (wg Jacka); `SCI_SUB = D_0 - D_900` (do potwierdzenia), skala TSD.
+- N2: H v2 + uczciwa dokladnosc; parametry sprzed poprawki OM; `NIGHT` z SW; tylko archiwum OM; u95 z RMSE pory; `CALIB_BOUND_HI`; tylko TN, glebokosc z flaga; cache OM jako sciezka.
+- Ogolne: scipy; sciezki + skip; liczby normatywne 5511/36/167/445; rozbieznosci jako notatki.
+Uwaga: w pytaniu Q-N4-1 w opisie opcji pomylkowo zapisalem "-1200 m"; chodzi o pary zerowe -200 m / +200 m / permutacja (tresc w PROJEKT.md poprawna).
+
+Otwarte do E2/E3: Q-N4-3 (offset -4,8 m), dostarczenie `UC_Schema.xsd` i potwierdzenie `SCI_SUB`.
