@@ -55,3 +55,14 @@ Praca zatrzymana po E0 zgodnie z promptem. Do decyzji (pelna lista: `docs\PROJEK
 **Wplyw na projekt:** zadnych zmian w kodzie (E1 nie ruszono); do decyzji: Q-N3-10 (format docelowy XML), Q-N3-11 (nazwa modelu temperatury). Pozostale pytania z E0 bez zmian.
 
 **STOP — decyzja**: patrz E0 + Q-N3-10, Q-N3-11, Q-N1-7.
+
+## 2026-11-14 — E0 (korekta): format XML = DSN zal. H p. 4.2
+
+**Co ustalono**
+- Jacek wskazal `inne\DSN_Zal.H.pdf` (str. 24): docelowy format XML = DSN. Odczytano zal. H (pdftotext): p. 4.2 definiuje `UC` (21 pol: KM, DYSTANS, DROGA, JEZDNIA, PAS, LAT, LON, DATA, GODZ, IRI_1, PROFIL_1, PREDKOSC, STRAIN_GAUGE, T_DROGI, T_POW, SCI_200, SCI_300, SCI_SUB, D_0, D_200, D_300; atrybuty KOD_ODDZ, ROK), p. 4.1 definiuje `UP` (FWD/KUAB).
+- Poprzedni wpis (przeglad `inne\`) blednie przedstawial "UC vs DSN" jako dwa formaty: UC jest formatem DSN; schematy `wdsn` Hellera w `inne\xml\arch\` to inny, starszy format. Skorygowano INWENTARZ (7.1, 7.3) i PROJEKT.
+- `UC_Schema.xsd` dostarczy Jacek; w XSD zal. H element glowny to `TSD`, w przykladzie `UC` (rozstrzygnie dostarczony plik).
+- Wplyw: Q-N3-10 rozstrzygniete (profil `dsn_h42`, 21 pol); problem Q-N3-2 znika dla tego profilu (potrzebne D_0, D_200, D_300 z d0 i calek P0 do 0,2/0,31 m); nowe pytania Q-N3-12 (SCI_SUB, skala), Q-N3-13 (czy `extended43`), Q-N1-8 (opcjonalny eksport `UP`).
+- Wyciag z zalacznika: `docs\notatki_E0\DSN_zal_H_4_1_UP_4_2_UC.txt`.
+
+**STOP — decyzja:** odpowiedzi na pytania z `docs\PROJEKT.md` sekcja 8 (w szczegolnosci Q-N1-1, Q-N1-3, Q-N1-5, Q-N1-6/7, Q-N3-12).

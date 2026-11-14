@@ -1,0 +1,215 @@
+WYCIAG z inne\DSN_Zal.H.pdf (Zalacznik H, Formaty danych), sekcje 4.1 (UP: FWD/KUAB) i 4.2 (UC: pomiar mobilny TSD) â€” strony 23-25.
+Tekst z pdftotext, polskie znaki w komentarzach czesciowo utracone (kodowanie PDF); struktura XML i XSD czytelne. Oryginal: inne\DSN_Zal.H.pdf.
+------------------------------------------------------------
+4.1. Dane ugicia FWD/KUAB (UP)
+Plik elementarny maszynowy zawierajcy dane ugi z FWD (KUAB)
+W atrybutach pliku dodatkowo zapisane s dane z informacj o numerze drogi, jezdni,
+pasa ruchu, kierunku narastania, roku danych.
+    Przyklad fragmentu pliku z danymi -- Ugicia FWD (KUAB)
+<?xml version="1.0" encoding="UTF-8"?>
+<UP xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" DROGA="63" JEZDNIA="1" PAS="1" KIERUNEK="R"
+ROK="2014" ODL1="300" ODL2="600" ODL3="900" ODL4="1200" ODL5="1500" ODL6="1800" ODL7="2100" ODL8="2100"
+xsi:noNamespaceSchemaLocation="UP_schema.xsd">
+<ODCINEK>
+    <KM>287.900</KM>                         <!-- pikieta -->
+    <ZRZUT>2</ZRZUT>                         <!-- nr zrzutu -->
+    <OBC_KN>54.4</OBC_KN>                    <!-- obcienie KN -->
+    <OBC_KPA>770</OBC_KPA>                   <!-- obcienie Kpa -->
+    <G0>494</G0>                             <!-- geofon 1 -->
+    <G1>389</G1>                             <!-- geofon 2 -->
+    <G2>372</G2>                             <!-- geofon 3 -->
+    <G3>321</G3>                             <!-- geofon 4 -->
+    <G4>302</G4>                             <!-- geofon 5 -->
+    <G5>180</G5>                             <!-- geofon 6 -->
+    <G6>122</G6>                             <!-- geofon 7 -->
+    <G7>91</G7>                              <!-- geofon 8 -->
+    <G8>68</G8>                              <!-- geofon 9 -->
+    <T_POW>15.0</T_POW>                      <!-- temp. powietrza -->
+    <T_NAW>21.0</T_NAW>                      <!-- temp. nawierzchni -->
+    <LAT>52.03696967</LAT>                   <!-- geofon 1 -->
+    <LON>22.30708233</LON>                   <!-- geofon 1 -->
+    <SAT>9</SAT>                             <!-- ilo satelit -->
+    <POMIAR>1</POMIAR>                       <!-- typ pomiaru GPS -->
+    <FOTO/>                                  <!-- nazwa pliku ze zdjciem -->
+    <DATA>2014-05-07</DATA>                  <!-- data pomiaru -->
+    <APARAT>KUAB</APARAT>                    <!-- typ urzdzenia -->
+</ODCINEK>
+</UP>
+    Definicja struktury pliku -- Ugicia FWD  (KUAB)
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" attributeFormDefault="unqualified"
+elementFormDefault="qualified">
+    <xs:annotation>
+    <xs:appinfo>DSN</xs:appinfo>
+    <xs:documentation xml:lang="pl">Schemat dla plików UGICIA (KUAB/FWD)</xs:documentation>
+    </xs:annotation>
+    <xs:element name="UP">
+    <xs:complexType>
+    <xs:sequence>
+    <xs:element maxOccurs="unbounded" name="ODCINEK">
+    <xs:complexType>
+    <xs:sequence>
+    <xs:element name="KM" type="KMTyp"/>
+    <xs:element name="ZRZUT" type="xs:integer"/>
+    <xs:element name="OBC_KN" type="decimal-or-empty"/>
+    <xs:element name="OBC_KPA" type="integer-or-empty"/>
+    <xs:element name="G1" type="decimal-or-empty"/>
+    <xs:element name="G2" type="decimal-or-empty"/>
+    <xs:element name="G3" type="decimal-or-empty"/>
+    <xs:element name="G4" type="decimal-or-empty"/>
+    <xs:element name="G5" type="decimal-or-empty"/>
+    <xs:element name="G6" type="decimal-or-empty"/>
+    <xs:element name="G7" type="decimal-or-empty"/>
+    <xs:element name="G8" type="decimal-or-empty"/>
+    <xs:element name="G9" type="decimal-or-empty"/>
+    <xs:element name="T_POW" type="decimal-or-empty"/>
+    <xs:element name="T_NAW" type="decimal-or-empty"/>
+    <xs:element name="LAT" type="decimal-or-empty"/>
+    <xs:element name="LON" type="decimal-or-empty"/>
+    <xs:element name="SAT" type="integer-or-empty"/>
+    <xs:element name="POMIAR" type="integer-or-empty"/>
+    <xs:element name="FOTO" type="xs:string"/>
+    <xs:element name="DATA" type="xs:date"/>
+    <xs:element name="APARAT" type="AparatTyp"/>
+    </xs:sequence>
+    </xs:complexType>
+    </xs:element>
+    </xs:sequence>
+    <xs:attribute name="DROGA" type="xs:string" use="required"/>
+    <xs:attribute name="JEZDNIA" type="xs:byte" use="required"/>
+    23
+Zalcznik H                                                                                 Formaty danych
+    <xs:attribute name="PAS" type="xs:byte" use="required"/>
+    <xs:attribute name="KIERUNEK" type="NARTyp" use="required"/>
+    <xs:attribute name="ROK" type="xs:gYear" use="required"/>
+    <xs:attribute name="ODL1" type=" integer-or-empty " use="required"/>
+    <xs:attribute name="ODL2" type=" integer-or-empty " use="required"/>
+    <xs:attribute name="ODL3" type=" integer-or-empty " use="required"/>
+    <xs:attribute name="ODL4" type=" integer-or-empty " use="required"/>
+    <xs:attribute name="ODL5" type=" integer-or-empty " use="required"/>
+    <xs:attribute name="ODL6" type=" integer-or-empty " use="required"/>
+    <xs:attribute name="ODL7" type=" integer-or-empty " use="required"/>
+    <xs:attribute name="ODL8" type=" integer-or-empty " use="required"/>
+    </xs:complexType>
+</xs:element>
+<xs:simpleType name="AparatTyp">                          <!-- typ aparatu -->
+    <xs:restriction base="xs:string">
+    <xs:enumeration value="KUAB"/>
+    <xs:enumeration value="FWD"/>
+    </xs:restriction>
+</xs:simpleType>
+<xs:simpleType name="KMTyp">                              <!-- typ dla kilometra    pocztku/konca -->
+    kierunku -->
+    <xs:restriction base="xs:decimal">                                           DECIMAL lub EMPTY -->
+    INTEGER lub EMPTY -->
+    <xs:fractionDigits value="3"/>
+    <xs:pattern value="\d+\.\d{3}"/>
+    </xs:restriction>
+</xs:simpleType>
+<xs:simpleType name="NARTyp">                             <!-- typ dla kategorii
+    <xs:restriction base="xs:string">
+    <xs:enumeration value="R"/>
+    <xs:enumeration value="M"/>
+    </xs:restriction>
+</xs:simpleType>                                          <!-- typ dla kategorii
+    <xs:simpleType name="decimal-or-empty">
+    <xs:union memberTypes="xs:decimal empty-string"/>
+</xs:simpleType>
+<xs:simpleType name="integer-or-empty">                   <!-- typ dla kategorii
+    <xs:union memberTypes="xs:integer empty-string"/>
+</xs:simpleType>
+<xs:simpleType name="empty-string">
+    <xs:restriction base="xs:string">
+    <xs:enumeration value=""/>
+    </xs:restriction>
+</xs:simpleType>
+</xs:schema>
+4.2. Dane ugi -- pomiar mobilny (UC)
+Plik elementarny maszynowy zawierajcy dane o nonoci z ugiciomierza laserowego
+TSD. W atrybutach pliku dodatkowo zapisane s dane z informacj o kodzie oddzialu,
+roku danych.
+    Przyklad fragmentu pliku z danymi -- Ugicia  (pomiar  mobilny)
+<?xml version="1.0" encoding="UTF-8"?>
+<UC xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" KOD_ODDZ="OP" ROK="2014"
+xsi:noNamespaceSchemaLocation="UC_Schema.xsd">
+<DANE>
+    <KM>100.001</KM>                         <!-- pikieta -->
+    <DYSTANS>1</DYSTANS>                     <!-- dystans -->
+    <DROGA>1</DROGA>                         <!-- nr drogi -->
+    <JEZDNIA>1</JEZDNIA>                     <!-- nr jezdni -->
+    <PAS>1</PAS>                             <!-- nr pasa ruchu -->
+    <LAT>52.221502</LAT>                     <!-- szeroko geograficzna -->
+    <LON>21.079828</LON>                     <!-- dlugo geograficzna -->
+    <DATA>2012-08-23</DATA>                  <!-- data pomiaru -->
+    <GODZ>12:00:00</GODZ>                    <!-- godzina pomiaru -->
+    <IRI_1>2.778105</IRI_1>                  <!-- -->
+    <PROFIL_1>2.584106</PROFIL_1>            <!-- -->
+    <PREDKOSC>53.660124</PREDKOSC>           <!-- prdko -->
+    <STRAIN_GAUGE>5056.978</STRAIN_GAUGE> <!-- -->
+    <T_DROGI>18.5</T_DROGI>                  <!-- temp. nawierzchni-->
+    <T_POW>20.6</T_POW>                      <!-- temp. powietrza -->
+    <SCI_200>62.80875</SCI_200>              <!-- -->
+    <SCI_300>119.45822</SCI_300>             <!-- -->
+    <SCI_SUB>178.8886</SCI_SUB>              <!-- -->
+    <D_0>396.692</D_0>                       <!-- -->
+    <D_200>328.8108</D_200>                  <!-- -->
+    <D_300>273.1881</D_300>                  <!-- -->
+</DANE>
+</UC>
+    24
+Zalcznik H                                                                                  Formaty danych
+    Definicja struktury pliku -- Ugicia (pomiar mobilny)
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" attributeFormDefault="unqualified"
+elementFormDefault="qualified">
+<xs:annotation>
+<xs:appinfo>DSN</xs:appinfo>
+<xs:documentation xml:lang="pl">Schemat dla plików TSD</xs:documentation>
+</xs:annotation>
+<xs:element name="TSD">
+<xs:complexType>
+    <xs:sequence>
+    <xs:element maxOccurs="unbounded" name="DANE">
+    <xs:complexType>
+    <xs:sequence>
+    <xs:element name="KM" type="decimal-or-empty"/>
+    <xs:element name="DYSTANS" type="decimal-or-empty"/>
+    <xs:element name="DROGA" type="xs:string"/>
+    <xs:element name="JEZDNIA" type="integer-or-empty"/>
+    <xs:element name="PAS" type="integer-or-empty"/>
+    <xs:element name="LAT" type="decimal-or-empty"/>
+    <xs:element name="LON" type="decimal-or-empty"/>
+    <xs:element name="DATA" type="xs:date"/>
+    <xs:element name="GODZ" type="xs:time"/>
+    <xs:element name="IRI_1" type="decimal-or-empty"/>
+    <xs:element name="PROFIL_1" type="decimal-or-empty"/>
+    <xs:element name="PREDKOSC" type="decimal-or-empty"/>
+    <xs:element name="STRAIN_GAUGE" type="decimal-or-empty"/>
+    <xs:element name="T_DROGI" type="decimal-or-empty"/>
+    <xs:element name="T_POW" type="decimal-or-empty"/>
+    <xs:element name="SCI_200" type="decimal-or-empty"/>
+    <xs:element name="SCI_300" type="decimal-or-empty"/>
+    <xs:element name="SCI_SUB" type="decimal-or-empty"/>
+    <xs:element name="D_0" type="decimal-or-empty"/>
+    <xs:element name="D_200" type="decimal-or-empty"/>
+    <xs:element name="D_300" type="decimal-or-empty"/>
+    </xs:sequence>
+    </xs:complexType>
+    </xs:element>
+    </xs:sequence>
+    <xs:attribute name="KOD_ODDZ" type="xs:string" use="required"/>
+    <xs:attribute name="ROK" type="xs:string" use="required"/>
+</xs:complexType>
+</xs:element>
+<xs:simpleType name="decimal-or-empty">            <!-- typ dla kategorii DECIMAL lub EMPTY -->
+<xs:union memberTypes="xs:decimal empty-string"/>
+</xs:simpleType>
+<xs:simpleType name="integer-or-empty">            <!-- typ dla kategorii INTEGER lub EMPTY -->
+<xs:union memberTypes="xs:integer empty-string"/>
+</xs:simpleType>
+<xs:simpleType name="empty-string">
+<xs:restriction base="xs:string">
+    <xs:enumeration value=""/>
+</xs:restriction>
+</xs:simpleType>
+</xs:schema>
