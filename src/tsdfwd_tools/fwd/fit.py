@@ -13,22 +13,18 @@ Wspolczynniki dopasowane na danych uzytkownika nie zastepuja zestawu raportu —
 from __future__ import annotations
 
 import math
-import zlib
 from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize_scalar, root
 
+from ..common.stats_basic import seed_for
+
 T_REF_C = 20.0
 K_BOUNDS = (-0.08, 0.08)
 FIT_RANGE_C = (5.0, 30.0)
 MIN_N_FIT = 30
-
-
-def seed_for(*parts) -> int:
-    """Deterministyczny seed z nazw (crc32), zamiast hash() nieprzewidywalnego miedzy procesami."""
-    return 1000 + (zlib.crc32("|".join(str(p) for p in parts).encode()) % 80000)
 
 
 def _prep_groups(y, groups):

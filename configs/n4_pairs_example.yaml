@@ -1,0 +1,24 @@
+# N4 tsd_fwd_compare, tryb pairs: gotowe pary TSD-FWD + temperatury warstwy po obu stronach (z N2 lub modelu).
+tool: tsd_fwd_compare
+schema_version: 1
+mode: pairs
+input:
+  pairs_csv: "C:/WORK/DOKTORAT/wymiana/wyniki/z15/Z15_temperatury_par.csv"   # pary + T12 (fwd_t12_cal, tsd_t12_cal)
+  meta_csv: "C:/projects/sql_tsd_fwd/tabele/e2b2_pairs.csv"                  # dt_days, win5_gof05_share, corridor_id, device, calib_interval
+  null_pairs_csv: "C:/projects/sql_tsd_fwd/tabele/e2b2_null_values.csv"      # pary zerowe (opcjonalnie)
+correction:
+  treatments: [none, main_after]
+  main_treatment: main_after
+measures:
+  lambda_d0: 0.11786960020790811
+  n_boot: 1000
+uncertainty:
+  methods: [session_bootstrap, wild_cluster_webb, cr2]
+  replicates: 9999
+conditions:
+  group_by: [device, calib_interval]
+calibration:
+  treatment: main_after
+output:
+  dir: "../wyniki/n4_pairs_example"
+  overwrite: true

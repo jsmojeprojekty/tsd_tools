@@ -40,6 +40,8 @@ def main(argv=None) -> int:
     tool = TOOLS[args.tool]
     if tool == "fit":
         return _main_fit(args)
+    if tool == "n4":
+        return _main_n4(args)
     if tool != "n1":
         print(f"narzedzie {args.tool} nie jest jeszcze zaimplementowane (kolejne etapy)", file=sys.stderr)
         return 1
@@ -64,6 +66,28 @@ def main(argv=None) -> int:
         critical = int(Flag.T_MISSING | Flag.T_BELOW_5C)
         if any((fr.table["flags"].to_numpy() & critical).any() for fr in result.files):
             return 2
+    return 0
+
+
+def _main_n4(args) -> int:
+    from ..common.config_n4 import load_n4_config
+    from ..compare.pipeline import run_n4
+    try:
+        cfg = load_n4_config(args.config)
+        if args.out_dir:
+            cfg.output.dir = args.out_dir
+        setup_logging(args.log_level or cfg.log_level)
+        result = run_n4(cfg, dry_run=args.dry_run)
+    except (ConfigError, FileNotFoundError, ValueError, KeyError, RuntimeError) as exc:
+        print(f"BLAD: {exc}", file=sys.stderr)
+        return 1
+    log = logging.getLogger("tsdfwd")
+    meta = result["meta"]
+    log.info("N4 (pairs): %d par (wazne %d), %d sesji FWD", meta["n_pairs"], meta["n_valid_pairs"], meta["n_sessions"])
+    for p in result["outputs"]:
+        log.info("zapisano %s", p)
+    if args.strict and meta["n_t12_outside_or_missing"]:
+        return 2
     return 0
 
 

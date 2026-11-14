@@ -136,3 +136,35 @@ Testy jednostkowe: odtworzenie znanej beta (0,016 i 0,012, efekt grupy), determi
 **Uwagi:** przedzialy ufnosci odtwarzaja sie dokladnie tylko przy tej samej wersji numpy/scipy (solver `root`); w tescie tolerancja 0,01 pp. Wspolczynniki SCI300/BDI/BCI z `fit` maja charakter diagnostyczny — nie sa uzywane do korekty (zasada metodyczna). Zrodla nie zmienione (kontrola `find -newermt`).
 
 **STOP — decyzja:** brak; nastepny krok E2 (N4, tryb `pairs`).
+
+## 2026-11-14 — E2: N4 `tsd_fwd_compare` (tryb `pairs`)
+
+**Co zrobiono**
+- Pakiet `compare\`: `agreement` (mediana ilorazu, SD log-ilorazu, Pearson/Spearman, r i rho w obrebie sesji, CCC Lina, Bland-Altman ilorazu, Deming log-log i liniowy, miary odporne, bootstrap po sesjach), `corrections` (korekta obu stron do 20 C: `none` / `main_after` (wykladnicza beta D0) / `k02`), `uncertainty` (dziki bootstrap klastrowy Webba WCU/WCR, CR2 z dof Satterthwaite, bootstrap sesji, bootstrap sparowany przed/po), `nulls` (kontrola zerowa; roznica prawda - zero ze wspolnym losowaniem sesji), `conditions` (tabela warunkow), `calibration` (mnoznik/afiniczna, ocena z pominieciem sesji), `pipeline`, `output` (CSV, `meta.json`, `report.html`).
+- Konfiguracja `config_n4.py` (mapowanie kolumn, warianty korekty, lambda z konfiguracji = 0,11786960, seedy jak w zrodle), CLI `tsd_fwd_compare` / `n4`, `configs\n4_pairs_example.yaml`. Tryb `geometry` odrzucany komunikatem (E2b).
+- Kod przeniesiony ze zrodel z naglowkami (`e2b2_agreement.py`, `z15_temp_correction.py`, `e2x_uncertainty_methods.py`, `e2bR9_lustro_warianty.py`, `e2bR9_lustro_warunki.py`, `e2bR9_lustro_kalibracja.py`, `e2b2b_extra.py`; stan c67f7fe).
+- Zmiany wzgledem zrodla (bez zmiany metod): ujemne `dt` nie sa gubione (przedzial `<0`; w zrodle 251 par wypadalo z tabeli); warunek "aparat x okres kalibracji" = `device` x `calib_interval` (zrodlo: `tsd_year`; mozliwe przez `group_by`); CV(D0) odcinka domyslnie na wartosciach par (jak w zrodle, odtwarza raport), opcja `cv_unit: stations` (unikalne stacje); pary z T12 poza 5-30 C lub bez T12 sa flagowane w `pairs_corrected.csv` i `meta.json` (mnoznik liczony takze dla nich - zastrzezenie raportu 7.3).
+
+**Co sprawdzono (124 testy zielone + 2 `xfail`; w tym 18 testow regresji N4 na danych referencyjnych, tylko odczyt)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| main_after: mediana ilorazu 1,61584 [1,5382; 1,68335]; 5511 par; 36 sesji | 1,615841 [1,538195; 1,683348] | <= 1e-5 | OK |
+| main_after: SD log 0,321151; r 0,659578; rho 0,580602; CCC 0,346871 | identyczne | <= 1e-6 | OK |
+| main_after: Deming log-log 0,958655 / 0,642298; liniowy 1,41861 / 8,16356 | 0,958655 / 0,642298; 1,418613 / 8,163564 | <= 1e-5 | OK |
+| main_before: 1,40644; SD 0,342756; r 0,611999; CCC 0,424149; Deming 1,05235 / 0,106303 | identyczne | <= 1e-5 | OK |
+| r w obrebie sesji W5: none / main_after / k02 (lustro) 0,407298 / 0,403905 / 0,402391 | 0,407041 / 0,403624 / 0,402107 | <= 3e-4 (tol. 5e-4) | OK |
+| pary zerowe, mediana ilorazu 1,59507 / 1,61026 / 1,59451 | 1,59522 / 1,60978 / 1,59316 | <= 1,4e-3 (tol. 2e-3) | OK |
+| pary zerowe, r globalne 0,517 / 0,525 / 0,408 | 0,5169 / 0,5242 / 0,4076 | <= 1e-3 | OK |
+| pary zerowe, r w obrebie sesji 0,155242 / 0,13524 / 0,0962062 | 0,15527 / 0,13446 / 0,09581 | <= 8e-4 | OK (patrz uwaga) |
+| niepewnosc W3: M0 [1,53804; 1,65362]; WCU [1,53793; 1,6602]; WCR p 0,9393; CR2 [1,53689; 1,66116], dof 20,5 | identyczne (9999 replik) | <= 1e-5 | OK |
+| grupy aparat x rok (Tab. 6.4): mediany przed i po, liczby sesji | identyczne | <= 1e-4 | OK |
+| Q1: SD log po-przed -0,0216 [-0,0366; -0,0064]; Q2: rozstep -0,2069, SD median grup -0,0854 | identyczne | <= 2e-4 | OK |
+| warunki: dt 0-1 r 0,857391 (n 119); 2-30 0,322221; >30 0,366773; GoF >= 0,8 0,814548; przeciecie 0,83682 (n 99) | 0,85739; 0,32216; 0,36609; 0,81461; 0,83682 (99) | <= 7e-4 (tol. 2e-3); n identyczne | OK |
+| kalibracja mnoznika W5 (k02): a 1,4222; MAE 27,6747 / LOSO 27,7366; mediana abs log 0,227208 / 0,227888 | 1,42212; 27,6777 / 27,7397; 0,22740 / 0,22815 | <= 3e-3 (tol. 0,01) | OK |
+| lambda d0 0,11787 (sigma_TSD 0,296408; sigma_FWD 0,101763) | z konfiguracji 0,1178696 | <= 1e-5 | OK |
+
+**Uwaga - Q-N4-1 wyjasnione:** rozbieznosc z E0 dotyczyla porownania z `e2b2b_null_test_paired.csv` (pary BEZ korekty temperaturowej, inna definicja r w obrebie sesji). N4 odtwarza wartosci raportu (lustro P071: 0,155 / 0,135 / 0,096) z `e2b2_null_values` + Z15 przy korekcie `main_after`; wartosci e2b2b odtwarza tylko dla +200 m (0,1411); dla -200 m i permutacji nie (0,157 / 0,090 vs 0,118 / 0,023) - te dwa przypadki zostaja `xfail` (informacyjnie).
+**Uwaga:** `C:\WORK\DOKTORAT\.git\FETCH_HEAD` ma czas modyfikacji 2026-11-14 09:53 - to automatyczny `git fetch` srodowiska (nie uruchamialem git w tym katalogu); pliki zrodlowe `DOKTORAT` i `sql_tsd_fwd` nie zostaly zmienione (kontrola `find -newermt`).
+**Czego tryb `pairs` nie robi:** nie buduje par z geometrii (E2b), nie liczy lambdy z powtorzen (Q-N4-5), nie przelicza krzywizn SCI300/BDI/BCI (raport 6.3: tylko orientacyjnie) i nie wybiera rekordu TSD wg wartosci FWD.
+
+**STOP - decyzja:** brak decyzji blokujacych E3; Q-N4-3 (offset -4,8 m) dopiero przy trybie `geometry` (E2b).
