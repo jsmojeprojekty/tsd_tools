@@ -123,7 +123,7 @@ Opcje: `--dry-run`, `--out-dir`, `--log-level`, `--strict`. Obliczenia z `replic
 | `agreement_ci.csv` | przedzialy mnoznika trzema metodami (bootstrap po sesjach, wild cluster Webb, CR2) |
 | `conditions.csv` | zgodnosc wg warunkow (aparat, kalibracja, odstep czasu, GoF, zmiennosc) |
 | `calibration.csv` | mnoznik/funkcja przeliczajaca oceniana poza proba (leave-session-out) |
-| `conversion.csv` | funkcja przeliczajaca TSD → FWD |
+| `conversion.csv` | funkcja przeliczajaca TSD → FWD; dla funkcji proporcjonalnej kolumna `factor` jest przelicznikiem uzywanym w N3 (`processing.to_fwd_conversion_csv`) |
 | `null_checks.csv`, `null_delta.csv` | kontrola zerowa: pary przesuniete o −200 m / +200 m i permutacje; roznica wzgledem par prawdziwych |
 | `pairs_corrected.csv` | pary z wartosciami skorygowanymi |
 | `meta.json` | wersje, hash konfiguracji, uzyta beta, liczniki par (w tym par bez T12 lub poza 5-30 C), uwaga metodyczna |

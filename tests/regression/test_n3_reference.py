@@ -120,6 +120,7 @@ def test_real_file_pipeline_and_xml(sql_root, tmp_path):
         pytest.skip(f"brak {path}")
     cfg = {"input": {"tsd_files": [str(path)]}, "layer_temp": {"source": "constant", "constant_c": 15.0},
            "xml_uc": {"enabled": True, "kod_oddz": "WA", "rok": 2025, "droga": "50", "jezdnia": 1, "pas": 1, "km_start": 40.0},
+           "processing": {"to_fwd_multiplier": 1.6},                                      # skala FWD (domyslna dla XML); wartosc tylko do testu struktury
            "output": {"dir": str(tmp_path / "out"), "rows_csv": True, "overwrite": True}}
     p = tmp_path / "n3.yaml"
     p.write_text(yaml.safe_dump(cfg), encoding="utf-8")

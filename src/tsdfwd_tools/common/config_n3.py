@@ -51,8 +51,9 @@ class N3Processing:
     position_offset_m: float = 0.0                       # lag polozenia ugiec (konwencja projektu: -4,8 => pos = pikietaz + 4,8 m); domyslnie 0 (decyzja Jacka)
     hampel: N3Hampel = field(default_factory=N3Hampel)
     correction: N3Correction = field(default_factory=N3Correction)
-    to_fwd_scale_enabled: bool = False                   # dodatkowe kolumny w skali FWD
-    to_fwd_multiplier: float = 1.62
+    to_fwd_scale_enabled: bool = False                   # dodatkowe kolumny d0_fwd20 w CSV (wymaga przelicznika)
+    to_fwd_multiplier: float | None = None               # przelicznik TSD -> FWD (zmienia sie po kazdej kalibracji; brak wartosci domyslnej)
+    to_fwd_conversion_csv: str | None = None             # albo conversion.csv z N4 (funkcja proporcjonalna) dla okresu kalibracji
 
 
 @dataclass
@@ -77,7 +78,7 @@ class N3Xml:
     km_direction: str = "increasing"                     # increasing | decreasing (KM wraz z pikietazem)
     chainage_start_m: float = 0.0
     schema_location: str = "UC_Schema.xsd"
-    scale: str = "tsd"                                   # tsd | fwd (mnoznik tylko opcjonalnie)
+    scale: str = "fwd"                                   # fwd (domyslnie, wymaga przelicznika) | tsd (skala TSD, np. diagnostyka)
     date_override: str | None = None                     # RRRR-MM-DD, gdy brak daty w nazwie pliku
 
 
@@ -133,12 +134,23 @@ def build_n3_config(data: dict, base_dir=".") -> N3Config:
     _choice(cfg.xml_uc.km_direction, ("increasing", "decreasing"), "xml_uc.km_direction")
     _choice(cfg.xml_uc.scale, ("tsd", "fwd"), "xml_uc.scale")
     x = cfg.xml_uc
+    if p.to_fwd_multiplier is not None and p.to_fwd_conversion_csv:
+        raise ConfigError("processing: podaj albo to_fwd_multiplier, albo to_fwd_conversion_csv (nie oba)")
+    if p.to_fwd_multiplier is not None and not p.to_fwd_multiplier > 0:
+        raise ConfigError("processing.to_fwd_multiplier musi byc dodatni")
+    has_factor = p.to_fwd_multiplier is not None or bool(p.to_fwd_conversion_csv)
+    if p.to_fwd_scale_enabled and not has_factor:
+        raise ConfigError("processing.to_fwd_scale_enabled wymaga to_fwd_multiplier albo to_fwd_conversion_csv (przelicznik zmienia sie po kazdej kalibracji)")
     if x.enabled:
         missing = [k for k in ("kod_oddz", "rok", "droga", "jezdnia", "pas", "km_start") if getattr(x, k) in (None, "")]
         if missing:
             raise ConfigError(f"xml_uc: wymagane w konfiguracji (bez wartosci domyslnych): {missing}")
         if x.step_m <= 0:
             raise ConfigError("xml_uc.step_m musi byc dodatnie")
+    if x.enabled and x.scale == "fwd" and not has_factor:
+        raise ConfigError("xml_uc.scale: fwd (domyslne) wymaga processing.to_fwd_multiplier albo processing.to_fwd_conversion_csv "
+                          "(przelicznik TSD->FWD z N4 dla okresu kalibracji; zmienia sie po kazdej kalibracji, nie ma wartosci domyslnej); "
+                          "skala TSD: xml_uc.scale: tsd")
     return cfg
 
 

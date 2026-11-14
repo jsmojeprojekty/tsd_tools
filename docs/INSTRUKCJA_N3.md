@@ -41,7 +41,10 @@ Opcje: `--dry-run`, `--out-dir`, `--log-level`, `--strict`. W konfiguracji mozna
 | `processing.hampel` | wlaczony, 10 m, k = 3 | |
 | `processing.aggregate_m` | `[50, 100]` | |
 | `processing.position_offset_m` | **0** | patrz p. 6 |
-| `processing.to_fwd_scale_enabled` | false | dodatkowa kolumna w skali FWD (mnoznik 1,62); **opcjonalna**, dla D_200 i D_300 niezweryfikowana (flaga `SCALE_FWD_UNVERIFIED`) |
+| `xml_uc.scale` | `fwd` | wartosci DSN w skali FWD (decyzja Jacka); wymaga przelicznika (nizej). `tsd` = skala TSD (diagnostyka) |
+| `processing.to_fwd_multiplier` | brak | przelicznik TSD→FWD wpisany recznie; **zmienia sie po kazdej kalibracji, wiec nie ma wartosci domyslnej** |
+| `processing.to_fwd_conversion_csv` | brak | albo `conversion.csv` z N4 dla okresu kalibracji (tylko funkcja proporcjonalna; przy funkcji liniowej Deming N3 odmawia). Podaj jedno z dwoj |
+| `processing.to_fwd_scale_enabled` | false | dodatkowa kolumna `d0_fwd20` w CSV (ten sam przelicznik) |
 | `qc.gps_gyro` | true | test zgodnosci kursu z zyroskopu i GPS (tylko diagnostyka, nie koryguje polozenia) |
 | `xml_uc.enabled` | false | `kod_oddz`, `rok`, `droga`, `jezdnia`, `pas`, `km_start` wymagane |
 | `xml_uc.km_direction` | `increasing` | `decreasing`, gdy kilometraz maleje wzdluz przejazdu |
@@ -67,7 +70,7 @@ W `output.dir`, dla pliku `<nazwa>.raw.sup.txt` (nazwa = czesc przed pierwsza kr
 ### Plik XML (profil `dsn_h42`, 21 pol)
 Kolejnosc pol jak w zalaczniku H p. 4.2: `KM, DYSTANS, DROGA, JEZDNIA, PAS, LAT, LON, DATA, GODZ, IRI_1, PROFIL_1, PREDKOSC, STRAIN_GAUGE,
 T_DROGI, T_POW, SCI_200, SCI_300, SCI_SUB, D_0, D_200, D_300`. Znaczenie: `D_0` = mediana D0 po korekcie do 20 C; `D_x = D_0 − P0(x)`;
-`SCI_200 = D_0 − D_200` (calka 0–0,20 m), `SCI_300 = D_0 − D_300` (calka 0–0,31 m, czyli do polozenia czujnika, podawana jako 300); `SCI_SUB` jest **pustym elementem** (pole pomijane — decyzja Jacka); `T_DROGI`, `T_POW` = odczyty temperatur z eksportu TSD (nie temperatura warstwy).
+`SCI_200 = D_0 − D_200` (calka 0–0,20 m), `SCI_300 = D_0 − D_300` (calka 0–0,31 m, czyli do polozenia czujnika, podawana jako 300); **W skali FWD** (domyslnie) wszystkie wartosci ugiecia i SCI (`D_0`, `D_200`, `D_300`, `SCI_200`, `SCI_300`) sa pomnozone przez przelicznik; reszta pol bez zmian. Przelicznik jest zweryfikowany dla D0; dla `D_200`, `D_300` i SCI pozostaje niezweryfikowany (`n3_meta.json`: `xml_uc.fwd_scale_unverified_fields`). Zrodlo i wartosc przelicznika zapisuje `n3_meta.json` (`xml_uc.fwd_scale`). `SCI_SUB` jest **pustym elementem** (pole pomijane — decyzja Jacka); `T_DROGI`, `T_POW` = odczyty temperatur z eksportu TSD (nie temperatura warstwy).
 `IRI_1` i `PROFIL_1` sa puste (eksport B_1510off nie zawiera tych kanalow). Brak wartosci to pusty element, nigdy `nan`.
 Plik: UTF-8 bez BOM, konce linii LF. Struktura jest sprawdzana wewnetrznie; **walidacja wzgledem `UC_Schema.xsd` zostanie dodana po
 dostarczeniu schematu** — do tego czasu plik trzeba traktowac jako zgodny z opisem z zalacznika H, ale niezweryfikowany schematem.

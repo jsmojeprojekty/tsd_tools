@@ -313,9 +313,18 @@ def test_n3_config_validation():
         build_n3_config({**base, "xml_uc": {"enabled": True, "kod_oddz": "WA"}})
     with pytest.raises(ConfigError):
         build_n3_config({**base, "xml_uc": {"profile": "extended43"}})
-    ok = build_n3_config({**base, "xml_uc": {"enabled": True, "kod_oddz": "WA", "rok": 2026, "droga": "50", "jezdnia": 1, "pas": 1,
-                                             "km_start": 40.0}})
-    assert ok.xml_uc.enabled
+    xml = {"enabled": True, "kod_oddz": "WA", "rok": 2026, "droga": "50", "jezdnia": 1, "pas": 1, "km_start": 40.0}
+    with pytest.raises(ConfigError, match="przelicznik"):                       # skala FWD (domyslna) bez przelicznika
+        build_n3_config({**base, "xml_uc": xml})
+    ok = build_n3_config({**base, "xml_uc": xml, "processing": {"to_fwd_multiplier": 1.6}})
+    assert ok.xml_uc.enabled and ok.xml_uc.scale == "fwd" and ok.processing.to_fwd_multiplier == 1.6
+    assert build_n3_config({**base, "xml_uc": {**xml, "scale": "tsd"}}).xml_uc.scale == "tsd"             # skala TSD bez przelicznika
+    with pytest.raises(ConfigError, match="nie oba"):
+        build_n3_config({**base, "processing": {"to_fwd_multiplier": 1.6, "to_fwd_conversion_csv": "c.csv"}})
+    with pytest.raises(ConfigError, match="dodatni"):
+        build_n3_config({**base, "processing": {"to_fwd_multiplier": -1.0}})
+    with pytest.raises(ConfigError, match="to_fwd_scale_enabled"):
+        build_n3_config({**base, "processing": {"to_fwd_scale_enabled": True}})
 
 
 # --- potok end-to-end na danych syntetycznych ---
@@ -323,7 +332,8 @@ def _cfg(tmp_path, tsd, **over):
     cfg = {"tool": "tsd_network", "input": {"tsd_files": [str(tsd)]},
            "layer_temp": {"source": "constant", "constant_c": 15.0},
            "qc": {"gps_gyro": False},
-           "xml_uc": {"enabled": True, "kod_oddz": "WA", "rok": 2025, "droga": "50", "jezdnia": 1, "pas": 1, "km_start": 40.0},
+           "xml_uc": {"enabled": True, "kod_oddz": "WA", "rok": 2025, "droga": "50", "jezdnia": 1, "pas": 1, "km_start": 40.0,
+                      "scale": "tsd"},                                        # domyslnie skala FWD (wymaga przelicznika); stare testy licza w skali TSD
            "output": {"dir": str(tmp_path / "out"), "rows_csv": True, "overwrite": True}}
     for k, v in over.items():
         cfg[k] = {**cfg.get(k, {}), **v}
@@ -448,15 +458,63 @@ def test_n3_missing_temperature_modes_and_errors(tmp_path, make_tsd):
 
 def test_n3_dry_run_and_overwrite_and_fwd_scale(tmp_path, make_tsd):
     tsd = make_tsd(n=60)
-    cfg = _cfg(tmp_path, tsd, output={"overwrite": False}, processing={"to_fwd_scale_enabled": True})
+    cfg = _cfg(tmp_path, tsd, output={"overwrite": False}, processing={"to_fwd_scale_enabled": True, "to_fwd_multiplier": 1.62})
     assert main(["tsd_network", "--config", str(cfg), "--dry-run"]) == 0
     assert not (tmp_path / "out").exists()
     assert main(["tsd_network", "--config", str(cfg)]) == 0
     assert main(["tsd_network", "--config", str(cfg)]) == 1                                  # plik istnieje
     agg = pd.read_csv(tmp_path / "out" / "T4202504230012_agg_50m.csv")
     assert (agg["d0_fwd20"] / agg["d0_20"]).dropna().round(6).eq(1.62).all()
-    fwd = _cfg(tmp_path, tsd, xml_uc={"scale": "fwd"}, output={"overwrite": True})
+    fwd = _cfg(tmp_path, tsd, xml_uc={"scale": "fwd"}, processing={"to_fwd_multiplier": 1.62}, output={"overwrite": True})
     assert main(["tsd_network", "--config", str(fwd)]) == 0
     import xml.etree.ElementTree as ET
     d0 = float([c.text for c in ET.parse(tmp_path / "out" / "UC_T4202504230012.xml").getroot()[1] if c.tag == "D_0"][0])
     assert d0 > 250                                                                          # ok. 1,62 * 180 * exp(...)
+
+
+# --- skala FWD w XML DSN (decyzja Jacka: wartosci DSN w skali FWD; przelicznik z N4, zmienia sie po kazdej kalibracji) ---
+def _xml_first_record(path):
+    import xml.etree.ElementTree as ET
+    return {c.tag: c.text for c in ET.parse(path).getroot()[1]}
+
+
+def test_xml_fwd_scale_multiplies_all_values_and_records_factor(tmp_path, make_tsd):
+    tsd = make_tsd(n=200, a=2000.0, d0_base=180.0)
+    out = tmp_path / "out"
+    cfg_t = _cfg(tmp_path, tsd)                                                              # skala TSD
+    assert main(["tsd_network", "--config", str(cfg_t)]) == 0
+    rec_t = _xml_first_record(out / "UC_T4202504230012.xml")
+    cfg_f = _cfg(tmp_path, tsd, xml_uc={"scale": "fwd"}, processing={"to_fwd_multiplier": 1.7}, output={"overwrite": True})
+    assert main(["tsd_network", "--config", str(cfg_f)]) == 0
+    rec_f = _xml_first_record(out / "UC_T4202504230012.xml")
+    for k in ("D_0", "D_200", "D_300", "SCI_200", "SCI_300"):
+        assert float(rec_f[k]) == pytest.approx(1.7 * float(rec_t[k]), rel=2e-4, abs=2e-3), k
+    for k in ("KM", "DYSTANS", "T_DROGI", "T_POW", "PREDKOSC", "STRAIN_GAUGE"):          # reszta pol bez zmian
+        assert rec_f[k] == rec_t[k], k
+    meta = json.loads((out / "T4202504230012_n3_meta.json").read_text(encoding="utf-8"))
+    assert meta["xml_uc"]["scale"] == "fwd" and meta["xml_uc"]["fwd_scale"]["factor"] == 1.7
+    assert "D_200" in meta["xml_uc"]["fwd_scale_unverified_fields"] and "D_0" not in meta["xml_uc"]["fwd_scale_unverified_fields"]
+
+
+def test_fwd_factor_from_n4_conversion_csv(tmp_path, make_tsd):
+    tsd = make_tsd(n=100)
+    conv = tmp_path / "conversion.csv"
+    pd.DataFrame([{"form": "proportional", "description": "D0_FWD,20 = factor * d0_TSD,20", "factor": 1.5, "factor_lo": 1.4,
+                   "factor_hi": 1.6, "n": 100}]).to_csv(conv, index=False)
+    cfg = _cfg(tmp_path, tsd, xml_uc={"scale": "fwd"}, processing={"to_fwd_conversion_csv": str(conv)})
+    assert main(["tsd_network", "--config", str(cfg)]) == 0
+    meta = json.loads((tmp_path / "out" / "T4202504230012_n3_meta.json").read_text(encoding="utf-8"))
+    f = meta["xml_uc"]["fwd_scale"]
+    assert f["factor"] == 1.5 and f["lo"] == 1.4 and f["hi"] == 1.6 and f["source"] == "n4:conversion.csv"
+
+
+def test_fwd_factor_refuses_non_proportional_or_foreign_conversion_csv(tmp_path, make_tsd, capsys):
+    tsd = make_tsd(n=100)
+    lin = tmp_path / "lin.csv"
+    pd.DataFrame([{"form": "deming_linear", "slope_a": 1.2, "intercept_b": 5.0}]).to_csv(lin, index=False)
+    assert main(["tsd_network", "--config", str(_cfg(tmp_path, tsd, xml_uc={"scale": "fwd"}, processing={"to_fwd_conversion_csv": str(lin)}))]) == 1
+    assert "deming_linear" in capsys.readouterr().err
+    other = tmp_path / "other.csv"
+    pd.DataFrame({"a": [1]}).to_csv(other, index=False)
+    assert main(["tsd_network", "--config", str(_cfg(tmp_path, tsd, xml_uc={"scale": "fwd"}, processing={"to_fwd_conversion_csv": str(other)}))]) == 1
+    assert main(["tsd_network", "--config", str(_cfg(tmp_path, tsd, xml_uc={"scale": "fwd"}, processing={"to_fwd_conversion_csv": str(tmp_path / "brak.csv")}))]) == 1

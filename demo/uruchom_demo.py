@@ -203,8 +203,9 @@ def demo_n3() -> str:
     src = SQL / "baza_TSD_FWD_odcinki/TSD/B_1510off/T4202504230012.raw.sup.txt"
     run("tsd_network", "n3", {"tool": "tsd_network", "schema_version": 1, "input": {"tsd_files": [str(src)]},
                               "layer_temp": {"source": "constant", "constant_c": 18.0},
-                              "processing": {"window_m": 5.0, "aggregate_m": [50, 100]}, "qc": {"gps_gyro": False},
-                              "xml_uc": {"enabled": True, "kod_oddz": "WA", "rok": 2025, "droga": "50", "jezdnia": 1, "pas": 1, "km_start": 40.0, "km_direction": "increasing"},
+                              "processing": {"window_m": 5.0, "aggregate_m": [50, 100], "to_fwd_conversion_csv": str(OUT / "n4_pairs" / "conversion.csv")},
+                              "qc": {"gps_gyro": False},
+                              "xml_uc": {"enabled": True, "kod_oddz": "WA", "rok": 2025, "droga": "50", "jezdnia": 1, "pas": 1, "km_start": 40.0, "km_direction": "increasing", "scale": "fwd"},
                               "output": {"dir": str(d), "rows_csv": False, "overwrite": True}})
     w = pd.read_csv(d / "T4202504230012_windows_10m.csv")
     summ = pd.read_csv(d / "summary.csv").iloc[0]
@@ -212,7 +213,7 @@ def demo_n3() -> str:
     ok = w["window_ok"].astype(bool)
     svg = line(w.loc[ok, "center_m"], [w.loc[ok, "d0_20"], w.loc[ok, "a031"]], "pikietaż [m]", "niebieska: d0 po korekcie; pomarańczowa: całka 0-0,31 m [µm]")
     return section("N3 — TSD na sieci i plik XML DSN",
-                   f"Prawdziwy przejazd TSD (eksport B_1510off, {int(summ['n_rows'])} wierszy co 1 m, {summ['date']}), temperatura warstwy 18 °C wpisana na stałe (w produkcji: wynik N2). "
+                   f"Prawdziwy przejazd TSD (eksport B_1510off, {int(summ['n_rows'])} wierszy co 1 m, {summ['date']}), temperatura warstwy 18 °C wpisana na stałe (w produkcji: wynik N2). Wartości w XML są w skali FWD: przelicznik TSD→FWD pochodzi z wyniku N4 (conversion.csv z poniższego porównania), bo zmienia się po każdej kalibracji. "
                    f"Narzędzie koryguje d0 do 20 °C, filtruje odstające wiersze (Hampel), liczy całki nachyleń, uśrednia w oknach ±5 m co 10 m i zapisuje XML w układzie załącznika H.",
                    "python -m tsdfwd_tools tsd_network --config konfiguracje\\n3.yaml",
                    f"<div class='row'>{svg}<div>{table(w, ['center_m', 'n_valid_d0', 'd0_20', 'a031', 'gof_share_ge05', 'speed_kmh'], 6)}</div></div>"
@@ -280,8 +281,10 @@ td,th{border:1px solid #ccc;padding:2px 7px}th{background:#eef}.note{font-size:1
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     parts, t0 = [], time.time()
-    for fn in (demo_n1, demo_n2, demo_n3, demo_n4_pairs, demo_n4_geometry):
-        parts.append(fn())
+    done = {}
+    for fn in (demo_n1, demo_n2, demo_n4_pairs, demo_n3, demo_n4_geometry):       # N3 bierze przelicznik FWD z wyniku N4 (conversion.csv)
+        done[fn.__name__] = fn()
+    parts = [done[n] for n in ("demo_n1", "demo_n2", "demo_n3", "demo_n4_pairs", "demo_n4_geometry")]
     page = (f"<html><head><meta charset='utf-8'><title>Demonstracja narzędzi TSD/FWD</title><style>{CSS}</style></head><body>"
             f"<h1>Narzędzia TSD/FWD — demonstracja</h1><p>Uruchomiono wszystkie narzędzia na danych przykładowych w {time.time() - t0:.0f} s. "
             f"Dane źródłowe nie są zmieniane (tylko odczyt); wyniki leżą w katalogu <code>demo\\wyniki</code>.</p>" + "".join(parts) + "</body></html>")

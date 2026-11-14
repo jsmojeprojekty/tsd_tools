@@ -26,6 +26,7 @@ from .flags import TsdFlag, flags_to_text
 from .integrals import p0_integrals
 from .io import TsdRun, read_b1510off
 from .qc import gps_gyro_qc, gps_valid
+from .fwd_scale import fwd_factor
 from .tempcorr import correct_d0, default_beta_pct, to_fwd_scale
 from .uc_export import write_uc_xml
 from .window import aggregate_bins, window_medians
@@ -82,6 +83,7 @@ def process_run(cfg: N3Config, path: Path) -> dict:
         # pusty 'Re-calibrationfile' = eksport nominalny (z czujnikiem 1,51 m); jego d0 nie jest zrodlem ugiecia w N3 (decyzja Jacka)
         raise ConfigError(f"{path.name}: eksport nominalny (pusty 'Re-calibrationfile'); N3 przyjmuje wylacznie eksport B_1510off "
                           "(d0 przeliczone z 9 czujnikow nachylen, bez czujnika 1,51 m)")
+    ff = fwd_factor(cfg)                                     # przelicznik TSD->FWD (None, gdy nie podano)
     d = run.data.copy().reset_index(drop=True)
     n = len(d)
     chain = d["chainage_m"].to_numpy(float)
@@ -133,7 +135,7 @@ def process_run(cfg: N3Config, path: Path) -> dict:
     d["flags"] = flags
     d["flags_text"] = [flags_to_text(m) for m in flags]
     if p.to_fwd_scale_enabled:
-        d["d0_fwd20"] = to_fwd_scale(d["d0_20"], p.to_fwd_multiplier)
+        d["d0_fwd20"] = to_fwd_scale(d["d0_20"], ff["factor"])
 
     # okno +-5 m: mediana kolumn (centra co step_m XML lub co 10 m)
     step_xml = cfg.xml_uc.step_m
@@ -147,7 +149,7 @@ def process_run(cfg: N3Config, path: Path) -> dict:
         agg = aggregate_bins(d.assign(chainage_m=d["pos_m"]), float(a), ["d0_20", "t12_c", "speed_kmh"] + INT_COLS,
                              "chainage_m", "d0_20", "gof", p.gof_threshold, p.min_rows_in_window)
         if p.to_fwd_scale_enabled:
-            agg["d0_fwd20"] = to_fwd_scale(agg["d0_20"], p.to_fwd_multiplier)
+            agg["d0_fwd20"] = to_fwd_scale(agg["d0_20"], ff["factor"])
         agg["flags_text"] = [flags_to_text(m) for m in _bin_flags(agg, p.correction.range_c, p.gof_threshold)]
         aggs[int(a)] = agg
 
@@ -169,9 +171,9 @@ def process_run(cfg: N3Config, path: Path) -> dict:
         "hampel": asdict(p.hampel), "window_m": p.window_m, "min_rows_in_window": p.min_rows_in_window,
         "integral": {"method": "pchip_dense_trapezoid", "step_m": p.integral_step_m, "channels": list(CHANNELS_9),
                      "integrals_corrected": False},
-        "position_offset_m": p.position_offset_m, "scale": "tsd", "qc_gps_gyro": {k: v for k, v in qc.items()},
+        "position_offset_m": p.position_offset_m, "scale": "tsd", "fwd_scale": ff, "qc_gps_gyro": {k: v for k, v in qc.items()},
         "note": ("Calki P0 nie sa korygowane temperaturowo (raport 6.1); D_x = d0_20 - P0(x) (d0 skorygowane, calka nie). "
-                 "Mnoznik na skale FWD jest opcjonalny i wazny dla wartosci odcinkowych (>= 100 m)."),
+                 "Wartosci DSN (XML) w skali FWD: D_0 jest przeliczone mnoznikiem z N4 (zweryfikowanym dla d0); dla D_200, D_300 i SCI mnoznik jest niezweryfikowany."),
     }
     return {"run": run, "rows": d, "windows": wins, "aggs": aggs, "summary": summary, "meta": meta, "qc": qc}
 
@@ -205,7 +207,7 @@ def _bin_flags(agg: pd.DataFrame, range_c, gof_min: float) -> np.ndarray:
 def build_xml_records(cfg: N3Config, result: dict) -> pd.DataFrame:
     """Rekordy pola DSN `UC` (profil dsn_h42) z okien +-5 m co step_m: D_0 = d0_20 (mediana), D_x = D_0 - P0(x) (mediany),
     SCI_200 = D_0 - D_200 (calka 0-0,20 m), SCI_300 = D_0 - D_300 (calka 0-0,31 m, podawane jako 300); SCI_SUB zostaje pustym elementem (decyzja Jacka: pole pomijane);
-    skala TSD (opcjonalnie FWD)."""
+    wartosci w skali FWD (xml_uc.scale: fwd, domyslnie; mnoznik z N4) albo TSD (xml_uc.scale: tsd)."""
     x = cfg.xml_uc
     run, d, w = result["run"], result["rows"], result["windows"]
     date = x.date_override or (run.date.isoformat() if run.date else None)
@@ -216,7 +218,7 @@ def build_xml_records(cfg: N3Config, result: dict) -> pd.DataFrame:
     pos_s = pos[order]
     sign = 1.0 if x.km_direction == "increasing" else -1.0
     recs = []
-    mult = cfg.processing.to_fwd_multiplier if x.scale == "fwd" else 1.0
+    mult = fwd_factor(cfg)["factor"] if x.scale == "fwd" else 1.0
     for _, r in w.iterrows():
         c = r["center_m"]
         j = order[int(np.clip(np.searchsorted(pos_s, c), 0, len(pos_s) - 1))]

@@ -432,3 +432,17 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 | Ten sam syntetyczny eksport jako TXT i XLSX: identyczne dane, flagi, okna 10 m i XML | zgodne bajt w bajt (testy `test_read_xlsx_sheet_same_as_txt`, `test_cli_n3_reads_xlsx_sheet_like_txt`) | 0 | OK |
 | Plik z sieci: data 2026-08-13, 905 wierszy, 885 waznych D0, flaga nominalnego eksportu | zgodne; N3 odmawia z komunikatem o eksporcie nominalnym | — | OK |
 | Testy N3 (jednostkowe + regresja) | 32 zaliczone (27 jednostkowych N3 + 5 regresyjnych) | — | OK |
+
+## 2026-11-14 — N3: wartosci XML DSN w skali FWD (decyzja Jacka)
+
+- Dwa cele narzedzi (Jacek): (1) uzytkownik dostarcza TSD i FWD i chce porownania (N4; kalibracja co najmniej raz w roku zmienia wszystko, takze przelicznik TSD→FWD); (2) uzytkownik dostarcza TSD i chce wyjscia zgodnego z DSN, w skali FWD. Zakres N4 `geometry` pozostaje (potrzebny w przypadku 1).
+- Zmiana: `xml_uc.scale` domyslnie `fwd`; `D_0`, `D_200`, `D_300`, `SCI_200`, `SCI_300` mnozone przez przelicznik. Przelicznik **nie ma wartosci domyslnej** (stary 1,62 usuniety): `processing.to_fwd_multiplier` (liczba) albo `processing.to_fwd_conversion_csv` (= `conversion.csv` z N4 dla okresu kalibracji; tylko funkcja proporcjonalna, przy liniowej Deming N3 odmawia). Zrodlo i wartosc w `n3_meta.json` (`xml_uc.fwd_scale`, razem z przedzialem z N4); pola niezweryfikowane (`D_200`, `D_300`, `SCI_*`) wylistowane w meta.
+- Demo: N4 `pairs` biegnie przed N3, a N3 bierze przelicznik z jego `conversion.csv` (1,6158 [1,5384; 1,6910]).
+- Nie zmieniono: temperatura i calki liczone jak dotad; mnoznik nakladany na koniec (D_0 = m·d0_20, D_x = m·(d0_20 − P0), SCI = m·P0).
+
+| Wzorzec | Uzyskano | Roznica | Status |
+|---|---|---|---|
+| XML w skali FWD = przelicznik × XML w skali TSD dla D_0, D_200, D_300, SCI_200, SCI_300; pozostale pola identyczne | zgodne (rel 2e-4 przy zaokragleniu do 3 miejsc w XML) | — | OK |
+| Przelicznik z `conversion.csv` N4: wartosc, przedzial, zrodlo w meta; odmowa dla funkcji nieproporcjonalnej, obcego pliku, braku pliku | zgodne | — | OK |
+| Konfiguracja: skala FWD bez przelicznika, oba zrodla naraz, przelicznik <= 0 -> blad | zgodne | — | OK |
+| Testy jednostkowe (207) i N3 z regresja (35) | wszystkie zaliczone | — | OK |

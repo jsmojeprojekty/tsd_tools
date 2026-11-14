@@ -48,6 +48,8 @@ def write_n3(cfg: N3Config, results: list) -> list:
             written.append(p)
         meta = dict(res["meta"])
         meta["xml_uc"] = ({"enabled": True, "profile": cfg.xml_uc.profile, "scale": cfg.xml_uc.scale,
+                           "fwd_scale": res["meta"].get("fwd_scale") if cfg.xml_uc.scale == "fwd" else None,
+                           "fwd_scale_unverified_fields": ["SCI_200", "SCI_300", "D_200", "D_300"] if cfg.xml_uc.scale == "fwd" else [],
                            "records": int(len(res["xml_records"]))} if cfg.xml_uc.enabled else {"enabled": False})
         p = _target(out_dir / f"{stem}_n3_meta.json", ow)
         p.write_text(json.dumps(meta, ensure_ascii=False, indent=2, default=str), encoding="utf-8")

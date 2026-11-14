@@ -7,6 +7,9 @@ layer_temp:
   source: constant          # w produkcji: csv z temperatura warstwy 12 cm (wynik N2): kolumny chainage_m, t12_c [, file]
   constant_c: 15.0
 processing:
+  # przelicznik TSD->FWD dla XML (skala FWD): z N4 dla okresu kalibracji; zmienia sie po kazdej kalibracji, nie ma wartosci domyslnej.
+  # Albo wpisz liczbe, albo wskaz conversion.csv z N4: to_fwd_conversion_csv: "../wyniki/n4/conversion.csv"
+  to_fwd_multiplier: 1.6158        # PRZYKLAD (wynik N4 na danych raportu); wpisz wartosc dla swojej kalibracji
   window_m: 5.0
   aggregate_m: [50, 100]
   hampel: {enabled: true, window_m: 10.0, k: 3.0}
