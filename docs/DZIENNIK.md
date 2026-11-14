@@ -431,4 +431,4 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 |---|---|---|---|
 | Ten sam syntetyczny eksport jako TXT i XLSX: identyczne dane, flagi, okna 10 m i XML | zgodne bajt w bajt (testy `test_read_xlsx_sheet_same_as_txt`, `test_cli_n3_reads_xlsx_sheet_like_txt`) | 0 | OK |
 | Plik z sieci: data 2026-08-13, 905 wierszy, 885 waznych D0, flaga nominalnego eksportu | zgodne; N3 odmawia z komunikatem o eksporcie nominalnym | — | OK |
-| Testy N3 (jednostkowe + regresja) | 30 zaliczonych (27 jednostkowych N3 + 3 regresyjne) | — | OK |
+| Testy N3 (jednostkowe + regresja) | 32 zaliczone (27 jednostkowych N3 + 5 regresyjnych) | — | OK |
