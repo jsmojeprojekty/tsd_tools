@@ -210,7 +210,7 @@ def demo_n3() -> str:
     summ = pd.read_csv(d / "summary.csv").iloc[0]
     xml = (d / "UC_T4202504230012.xml").read_text(encoding="utf-8").splitlines()
     ok = w["window_ok"].astype(bool)
-    svg = line(w.loc[ok, "center_m"], [w.loc[ok, "d0_20"], w.loc[ok, "a031"]], "pikietaż [m]: niebieska = d0 po korekcie, pomarańczowa = całka 0-0,31 m [µm]")
+    svg = line(w.loc[ok, "center_m"], [w.loc[ok, "d0_20"], w.loc[ok, "a031"]], "pikietaż [m]", "niebieska: d0 po korekcie; pomarańczowa: całka 0-0,31 m [µm]")
     return section("N3 — TSD na sieci i plik XML DSN",
                    f"Prawdziwy przejazd TSD (eksport B_1510off, {int(summ['n_rows'])} wierszy co 1 m, {summ['date']}), temperatura warstwy 18 °C wpisana na stałe (w produkcji: wynik N2). "
                    f"Narzędzie koryguje d0 do 20 °C, filtruje odstające wiersze (Hampel), liczy całki nachyleń, uśrednia w oknach ±5 m co 10 m i zapisuje XML w układzie załącznika H.",
