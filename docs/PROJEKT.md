@@ -236,14 +236,20 @@ Nieobslugiwane celowo: wlasne wspolczynniki wskaznikow; korekta T < 5 C; korekta
 
 ### 4.3 layer_temp (N2)
 ```python
-class OpenMeteoClient: def fetch(self, lat, lon, start: date, end: date) -> pd.DataFrame   # archive-api, timezone=UTC, 6 zmiennych, retry 429, cache
-def om_utc_to_local(df_utc) -> pd.DataFrame                                                  # Europe/Warsaw, naiwny; duplikat jesienny: pierwsze wystapienie
-def build_frame(om_local, t_min, t_max) -> pd.DataFrame                                      # siatka 10 min, swr przesuniete -30 min, MA1d/7d/30d
-def simulate_eb(frame, params, a_sw: float, depths_m=None) -> np.ndarray                     # PELNA siatka T[nt, 51] (0-50 cm)
-def calibrate_single_shot(frame, t50, ir_mass: float, t: pd.Timestamp, params) -> Calibration # brentq po a_sw; flagi ok/bound_lo/bound_hi/gate/nosim
-def layer_temperature(ts, lat, lon, ir, air, depth_m=0.12, *, meteo=None, params=None) -> LayerTempResult
-    # LayerTempResult: value, u95, a_sw, ts_sim, calib_flag, qc_flags(list), grid_lat/lon, params_hash
-def run_n2(cfg: N2Config) -> N2Result
+# stan wdrozenia (E4) — pakiet tsdfwd_tools.layer_temp
+fetch_open_meteo(lat, lon, start, end, *, http_get=None, sleep=time.sleep) -> (DataFrame lokalny, meta)  # meteo.py; urllib (bez `requests`), timezone=UTC, 6 zmiennych, retry 429
+class MeteoStore(cache_dir, offline=True, grid_deg=0.05)  # .get(lat, lon, lo, hi) -> (om, info); cache parquet (referencyjny) i csv+json (zapisywany); pobiera brakujace okno (dzien pomiaru + 1)
+om_utc_to_local(df_utc) -> DataFrame           # Europe/Warsaw, naiwny; duplikat jesienny: pierwsze wystapienie; luka wiosenna: brak wiersza
+build_frame(om, index) -> DataFrame            # frame.py: siatka 10 min, swr przesuniete -30 min, MA7/MA30, sw_ma6 (rolling 36, min_periods 18)
+bottom_t50(frame, params), delta_ir(frame, params), longwave_down(...)
+simulate_eb(sub, bottom, params, a_sw) -> np.ndarray      # solver.py: PELNA siatka T[nt, 51] (0-50 cm), pierwsze 288 krokow NaN
+calibrate_single_shot(ts_of_a, target, a_default, bounds, gate_c, xtol) -> Calibration   # calibrate.py: brentq; ok/bound_lo/bound_hi/gate/nosim
+class CellDay(om, day, t_end, params)                      # predict.py: ramka + symulacje wspolne dla (komorka, doba); symulacja przyczynowa
+predict_at(ctx, t, ir, depth_m, calibration=..., qc=...) -> LayerTempResult
+layer_temperature(ts, lat, lon, ir, air=None, depth_m=0.12, *, meteo, params=None, calibration=..., with_bells3=False) -> LayerTempResult
+run_survey(df, meteo, params, depth_cm=12, ...) -> DataFrame          # seria; grupowanie po (komorka, doba)
+run_n2(cfg: N2Config, dry_run=False) -> dict(table, meta, outputs)    # pipeline.py
+# LayerTempResult: value, value_uncal, u95, a_sw, ts_sim, ir_masa, calib_flag, flags (LayerFlag), grid_lat/lon, sw_ma6, bells3, params_hash
 ```
 Niepewnosc (propozycja do uzgodnienia, Q-N2-5): u95 = +-2*RMSE_pora (6-12 h: 2,8; 12-18 h: 3,8; noc: 4,3), nie mniej niz 2,2 C (dolna granica metody pomiaru).
 
@@ -295,7 +301,8 @@ Wszystkie CSV: UTF-8 (bez BOM), separator `,`, kropka dziesietna, naglowek angie
 Flagi: `T_MISSING, T_BELOW_5C (brak zastosowania), T_ABOVE_RANGE (powyzej zakresu wariantu), T_CARRIED, T_PLACEHOLDER (np. 20,4), T_STALE, T_MODEL (z N2), INDEX_ABOVE_RANGE (SCI300/BDI/BCI przy T > 25 C), INDEX_NONPOSITIVE, FORCE_OFF_NOMINAL, SEATING_ONLY, THICKNESS_OUT_OF_RANGE`.
 
 ### 5.2 N2
-`layer_temp.csv`: `id, measured_at_local, latitude, longitude, t_surface, t_air, depth_cm, t_layer, u95, a_sw, ts_sim, calib_flag, grid_lat, grid_lon, sw_ma6, qc_flags`; `meta` z wersja parametrow i hashem, `fetched_at` i produktem Open-Meteo. Flagi: `NIGHT, OUT_OF_SEASON, SNOW, METEO_GAP, TAIL_EXTRAPOLATED, CALIB_GATE, CALIB_BOUND_HI, CALIB_BOUND_LO, DEPTH_OUT_OF_RANGE, SHADED_SITE_SUSPECTED, POSITION_OUT_OF_POLAND`.
+`layer_temp.csv`: `id, measured_at_local, latitude, longitude, t_surface, [t_air], depth_cm, t_layer, u95, a_sw, ts_sim, calib_flag, grid_lat, grid_lon, sw_ma6, qc_flags, flags_text, t_layer_uncal, ir_masa, [bells3_c], [t12_c (gdy depth_cm = 12; nazwa domyslna kolumny temperatury w N3)], [passthrough]`; `layer_temp_meta.json` z wersja i hashem parametrow, produktem i trybem Open-Meteo, licznikami flag, konfiguracja i uwaga o dokladnosci (H 1,75 / C 2,73). Flagi (`LayerFlag`): `NIGHT, OUT_OF_SEASON, SNOW, METEO_GAP, TAIL_EXTRAPOLATED, CALIB_GATE, CALIB_BOUND_HI, CALIB_BOUND_LO, CALIB_NOSIM, IR_MISSING, CALIB_OFF, DEPTH_NOT_VALIDATED, DEPTH_OUT_OF_RANGE, SHADED_SITE_SUSPECTED (zarezerwowana, niewykrywana), POSITION_OUT_OF_POLAND`.
+Wdrozone w E4 przy domyslnych odpowiedziach na Q-N2-1..9 (patrz DZIENNIK): regresja na H v2, parametry pre-omfix, NIGHT = SW_ma6 < 5 W/m2, tylko archiwum, u95 = 2*RMSE_pora (min. 2,2 C), CALIB_BOUND_HI jako flaga, brak klasy zacienionej, DEPTH_NOT_VALIDATED poza 10/12 cm, cache testowy czytany z `doktorat_root` (bez kopiowania).
 
 ### 5.3 N3
 `tsd_rows.csv` (opcjonalnie, 1 m): `file_id, chainage_m, s_corridor_m, datetime, latitude, longitude, d0, d0_20, a031, a0361, a6191, a061, a091, gof, speed_kmh, t12, flags`.
@@ -365,7 +372,7 @@ Legenda: tolerancja 0,01 w jednostce wielkosci, chyba ze podano inaczej. `@refer
 | T-N2-05 | RMSE wg pory | 2,167 (n 49) / 1,378 (n 226) / 1,889 (n 237) / 2,167 (n 37) | 0,005 | @reference |
 | T-N2-06 | Solver: stan stacjonarny, bilans energii, round-trip kalibracji (Ts(a*)=target -> a~a*) | analitycznie | 1e-3 | @unit |
 | T-N2-07 | Czas/DST/UTC: `om_utc_to_local` (godzina podwojna, luka wiosenna), pomiar o 23:30 | wg opisu | dokladnie | @unit |
-| T-N2-08 | Tryb sieciowy: mock `requests.get` (`timezone=UTC`, `wind_speed_unit=ms`, 6 zmiennych); retry 429; brak innych polaczen | wg opisu | dokladnie | @unit |
+| T-N2-08 | Tryb sieciowy: atrapa `http_get` (klient na `urllib`, bez `requests`): `timezone=UTC`, `wind_speed_unit=ms`, 6 zmiennych, okno [start-1 d, end+1 d]; retry 429; tryb offline bez zapytan | wg opisu | dokladnie | @unit |
 | T-N2-09 | Dryf parametrow: hash `params_TN.json` | wg zrodla | dokladnie | @unit |
 | T-N2-10 | Z15 (2. poziom): 200 par `{fwd,tsd}_t12_cal` vs `Z15_temperatury_par.csv` | zgodne < 1e-6 | 1e-6 | @reference |
 Uwaga: test T-N2-01 odtwarza zbior H (eksploracyjny) — to test powtarzalnosci, NIE deklaracja dokladnosci produktu (zbior niezalezny C: 2,73 [2,44; 2,98]).

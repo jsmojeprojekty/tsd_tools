@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 mdb = ["pyodbc>=5.0"]
-net = ["requests>=2.31"]
+parquet = ["pyarrow>=14"]                          # odczyt cache Open-Meteo w formacie parquet (cache referencyjny)
 plots = ["matplotlib>=3.8"]
 dev = ["pytest>=8.0"]
 

@@ -1,0 +1,29 @@
+{
+  "name": "params_TN",
+  "description": "Parametry zamrozone modelu temperatury warstwy asfaltowej N2 (klasa terenu: otwarta, stacja TN). Wersja sprzed poprawki czasu Open-Meteo (decyzja Jacka Q-N2-2).",
+  "source": {
+    "project": "C:\\WORK\\DOKTORAT\\temp_model",
+    "alpha": "output\\E2-T01_calibration_summary_top-t_2cm.csv (variant global, station TN)",
+    "eb": "output\\E2-T05_eb_surface_bc_params.csv (TN)",
+    "beta50": "OLS (ob.fit_ols) na output\\E2-T07_features_TN.parquet, 2025-08-20..2026-08-19, snow_period == False, 43 302 wiersze",
+    "beta_ir": "ob.fit_ir_corr na tych samych wierszach (cechy: swr_kw, swr_kw*wiatr, clear_night, clear_night*wiatr)",
+    "extracted": "2026-11-13 (audyt E0; wartosci zweryfikowane niezalezna replika: RMSE 1,7488 / MAE 1,4042 / bias +0,2649 na zbiorze H v2)"
+  },
+  "parameters": {
+    "alpha_m2_s": 1.1180916449068726e-06,
+    "eb": {
+      "a_sw": 1.0,
+      "h0": 13.703653335884345,
+      "h1": 0.8635956775154445,
+      "c_vol": 2491672.4664717293,
+      "svf": 1.0
+    },
+    "beta50": [4.345912232478229, -0.5238792264652146, -3.479711280281572, 0.5972550045675352, 0.2659045471826211],
+    "beta50_features": ["const", "doy_sin", "doy_cos", "ta_ma7d", "ta_ma30d"],
+    "beta_ir": [-2.786519348653504, 5.08355350162691, -0.33793970242554944, -2.3739849783973197, 0.34833124664883247],
+    "beta_ir_features": ["const", "swr_kw", "swr_kw_x_wind", "clear_night", "clear_night_x_wind"]
+  },
+  "bounds": {
+    "a_sw": [0.03, 1.0]
+  }
+}

@@ -1,0 +1,43 @@
+# N2 layer_temp: temperatura warstwy asfaltowej (fizyka 1-D + kalibracja jednorazowa do pirometru, meteo z Open-Meteo).
+# Uruchomienie: python -m tsdfwd_tools layer_temp --config configs\n2_example.yaml
+tool: layer_temp
+schema_version: 1
+log_level: INFO
+
+input:
+  survey_csv: "D:/dane/pomiary_pirometr.csv"       # kolumny jak ponizej (nazwy mozna zmienic)
+  time_column: measured_at_local                  # czas lokalny naiwny z DST (Europe/Warsaw), np. 2025-07-14 11:35:00
+  lat_column: latitude
+  lon_column: longitude
+  ir_column: t_surface                            # odczyt pirometru [C]
+  air_column: t_air                               # opcjonalna; nie wchodzi do modelu (kopiowana do wyniku)
+  id_column: null
+  passthrough: []                                 # np. [chainage_m, file] - wtedy wynik jest wejsciem temperatury dla N3
+  time_basis: local_Europe_Warsaw_DST
+
+model:
+  depth_cm: 12                                    # zwalidowane: 10 i 12 cm; inne glebokosci 0-50 cm z flaga DEPTH_NOT_VALIDATED
+  thickness_cm: null                              # gdy podane: glebokosc = grubosc/2
+  params_file: builtin:params_TN.json             # parametry zamrozone (teren otwarty, stacja TN)
+  terrain_class: open
+  calibration: single_shot_ir_mass                # none = fizyka bez kalibracji do pirometru
+
+meteo:
+  provider: open_meteo_archive
+  cache_dir: "D:/cache/open_meteo"                # wyniki pobierania; jedyne polaczenie sieciowe pakietu
+  offline: false                                  # true = tylko cache (bez pobierania)
+  grid_deg: 0.05
+  history_days: 35
+
+qc:
+  season_months: [4, 5, 6, 7, 8, 9, 10]           # poza sezonem: flaga OUT_OF_SEASON
+  snow_depth_max_m: 0.005
+  night_sw_wm2: 5.0                               # SW_ma6 < 5 W/m2 -> flaga NIGHT (kalibracja do pirometru nie dziala)
+
+comparators:
+  bells3: false                                   # BELLS3 klasyczny jako dodatkowa kolumna bells3_c
+
+output:
+  dir: "wyniki/n2"
+  name: layer_temp
+  overwrite: false

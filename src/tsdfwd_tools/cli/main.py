@@ -1,6 +1,6 @@
 """Wiersz polecen: python -m tsdfwd_tools <narzedzie> --config plik.yaml
 
-Narzedzia: fwd_tempcorr (n1). Pozostale (layer_temp/n2, tsd_network/n3, tsd_fwd_compare/n4) powstaja w kolejnych etapach."""
+Narzedzia: fwd_tempcorr (n1), fwd_fit, layer_temp (n2), tsd_network (n3), tsd_fwd_compare (n4, tryb pairs)."""
 
 from __future__ import annotations
 
@@ -44,6 +44,8 @@ def main(argv=None) -> int:
         return _main_n4(args)
     if tool == "n3":
         return _main_n3(args)
+    if tool == "n2":
+        return _main_n2(args)
     if tool != "n1":
         print(f"narzedzie {args.tool} nie jest jeszcze zaimplementowane (kolejne etapy)", file=sys.stderr)
         return 1
@@ -68,6 +70,29 @@ def main(argv=None) -> int:
         critical = int(Flag.T_MISSING | Flag.T_BELOW_5C)
         if any((fr.table["flags"].to_numpy() & critical).any() for fr in result.files):
             return 2
+    return 0
+
+
+def _main_n2(args) -> int:
+    from ..common.config_n2 import load_n2_config
+    from ..layer_temp.pipeline import run_n2
+    try:
+        cfg = load_n2_config(args.config)
+        if args.out_dir:
+            cfg.output.dir = args.out_dir
+        setup_logging(args.log_level or cfg.log_level)
+        result = run_n2(cfg, dry_run=args.dry_run)
+    except (ConfigError, FileNotFoundError, ValueError, KeyError, RuntimeError) as exc:
+        print(f"BLAD: {exc}", file=sys.stderr)
+        return 1
+    log = logging.getLogger("tsdfwd")
+    meta = result["meta"]
+    log.info("N2: %d wierszy, T warstwy obliczona dla %d, kalibracja: %s, zapytan sieciowych: %d", meta["n_rows"],
+             meta["n_valid_t_layer"], meta["calib_flags"], meta["meteo"]["n_requests_made"])
+    for p in result["outputs"]:
+        log.info("zapisano %s", p)
+    if args.strict and meta["n_valid_t_layer"] < meta["n_rows"]:
+        return 2
     return 0
 
 

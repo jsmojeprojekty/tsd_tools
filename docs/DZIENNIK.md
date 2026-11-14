@@ -202,3 +202,37 @@ Calki P0 z B_1510off dla `a031_w5` pary 5288 (30,43) NIE odtwarzaja `e2b2_tsd_va
 **Co zostaje:** E4 (N2: temperatura warstwy), E2b (tryb `geometry` N4), E5 (instrukcje); do ustalenia: Q-N3-14, Q-N3-15, Q-N3-16, `UC_Schema.xsd`.
 
 **STOP — decyzja:** brak decyzji blokujacych E4.
+
+## 2026-11-14 — E4: N2 `layer_temp` (temperatura warstwy asfaltowej)
+
+**Co zrobiono**
+- Pakiet `layer_temp\`: `constants`, `params` (+ `data\params_TN.json`, hash SHA-256 sekcji `parameters`: 36780ba8...f4d04, test dryfu), `meteo` (klient Open-Meteo na `urllib`, `om_utc_to_local`, `MeteoStore` z cache parquet/csv+json, plan okien), `frame` (siatka 10 min, promieniowanie dlugofalowe, cechy dolnego BC, korekta IR do "masy", SW_ma6), `solver` (1-D przewodzenie + bilans energii powierzchni, siatka 1 cm 0-50 cm, rozbieg 288 krokow), `calibrate` (kalibracja jednorazowa a_sw: brentq, bramka 1 C, granice 0,03-1,0), `predict` (`CellDay`, `predict_at`, `layer_temperature`, `run_survey` z grupowaniem po komorce i dobie), `bells3` (komparator opcjonalny, tylko wspolczynniki oryginalne), `uncertainty`, `flags` (15 flag `LayerFlag`), `pipeline`, `output`; `common\config_n2.py`, CLI `layer_temp` / `n2`, `configs\n2_example.yaml`.
+- Parametry zamrozone: klasa terenu otwartego (stacja TN), wersja sprzed poprawki czasu OM (Q-N2-2, domyslnie), alpha 1,11809e-6 m2/s, EB (h0 13,7037; h1 0,8636; c_vol 2,4917e6), dolny BC t50 (OLS: doy sin/cos, MA7, MA30), korekta IR (beta_ir, 5 skladnikow). Zrodla: E2-T01/T05/T07 projektu temp_model, replika z audytu E0.
+- Decyzje implementacyjne bez zmiany metody: (1) klient HTTP na `urllib` zamiast `requests` (mniej zaleznosci; ten sam adres, parametry i zachowanie: `timezone=UTC`, `wind_speed_unit=ms`, 6 zmiennych, retry 429); (2) zapytanie konczy sie dniem pomiaru + 1 — ogon po 23:00 jest pokryty danymi (referencyjny cache konczy sie dniem pomiaru; tam chwile po 23:00 dostaja flage `TAIL_EXTRAPOLATED`); (3) cache zapisywany jako CSV+JSON (bez pyarrow), cache referencyjny (parquet) czytany — dodatek `parquet` w `pyproject.toml`; (4) symulacja jest przyczynowa, wiec jedna ramka i symulacje graniczne (a_sw = 0,03 i 1,0) obsluguja wszystkie chwile tej samej komorki i doby (549 obserwacji w 16 s); (5) wynik zawiera kolumne `t12_c` (dla 12 cm) i przepisywane kolumny (`passthrough`, np. `chainage_m`), wiec jest wejsciem temperatury warstwy dla N3.
+- Odpowiedzi na Q-N2-1..9 (przyjete domyslne, do wgladu Jacka): H v2 jako test regresji z uczciwa nota o dokladnosci na zbiorze C (2,73 C) w meta wyniku; pre-omfix; NIGHT = SW_ma6 < 5 W/m2 (jak w zrodle: rolling 36, min_periods 18); tylko archiwum (dane z ostatnich ~5 dni ostrzezenie w logu); u95 = 2*RMSE wg pory doby, nie mniej niz 2,2 C (heurystyka, tak opisana); a_sw <= 1 jako flaga `CALIB_BOUND_HI`; klasa zacieniona pominieta (flaga zarezerwowana, nie wykrywana); glebokosc poza 10/12 cm z flaga `DEPTH_NOT_VALIDATED`; cache testowy czytany z `doktorat_root` (bez kopiowania).
+
+**Co sprawdzono (187 testow zielonych + 2 `xfail` z E2; 29 jednostkowych i 8 regresji N2)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| T-N2-01 zbior H v2 (549 obs., 226 sesji), 12 cm: RMSE 1,7486 / MAE 1,4039 / bias +0,2653 | 1,7488 / 1,4042 / +0,2649 | +0,0002 / +0,0003 / -0,0004 (tol. 0,001; to samo co replika zrodlowa) | OK |
+| T-N2-02 flagi kalibracji: ok 294, bound_hi 244, gate 11, bound_lo 0 | 294 / 244 / 11 / 0 | 0 | OK |
+| T-N2-03 po obserwacji vs `phys_single_masa` (`Z14c_candidates.parquet`) | 544/549 zgodne < 1e-6 C; 5 obs. po 23:00 rozni sie max 0,182 C (flaga `TAIL_EXTRAPOLATED` ustawiona dokladnie na tych 5); flaga i a_sw zgodne poza ogonem | <= 0,2 C wg opisu | OK |
+| T-N2-04 fizyka bez kalibracji 2,0872 / 1,6974 / +0,9455; BELLS3 2,4065 / 1,8160 / -0,3432 | 2,0872 / 1,6974 / +0,9455; 2,4065 / 1,8160 / -0,3432 | BELLS3 po obserwacji identyczny ze zrodlem < 1e-9 | OK |
+| T-N2-05 RMSE wg pory (n 49 / 226 / 237 / 37): 2,167 / 1,378 / 1,889 / 2,167 | 2,167 / 1,378 / 1,889 / 2,168 | <= 0,001 (tol. 0,005) | OK |
+| SW_ma6 vs kolumna `sw_ma6` w `Z14c_candidates` | identyczne | < 1e-6 | OK |
+| T-N2-10 (Z15, 200 par x 2 strony FWD/TSD): T12 po kalibracji, bez kalibracji, BELLS3, a_sw vs `Z15_temperatury_par.csv` | zgodne | < 1e-6 poza ogonem (<= 0,25 C) | OK |
+| T-N2-06 solver: stan ustalony (profil liniowy, bilans energii powierzchni), round-trip kalibracji (a* = 0,55 -> a = 0,55) | zgodne | bilans < 1e-3 W/m2; a +- 2e-3 | OK |
+| T-N2-07 czas/DST: godzina podwojna (jesien), luka wiosenna, offsety lato/zima | zgodne | dokladnie | OK |
+| T-N2-08 klient: parametry zapytania, okno [start-1 d, end+1 d], retry 429 (5 prob), blad 500, tryb offline bez zapytan, cache | zgodne | dokladnie | OK |
+| T-N2-09 hash parametrow | zgodny; zmiana parametru zmienia hash | dokladnie | OK |
+| kontrola zywa: jedno zapytanie do Open-Meteo (okno 2021-09-10..14, komorka 50,20; 19,15) vs zapisany cache referencyjny, 6 zmiennych x 120 godzin | identyczne | 0 | OK |
+Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja dokladnosci produktu (zbior niezalezny C: RMSE 2,73 [2,44; 2,98]); 44 % obserwacji H (244 z 549) trafia na gorna granice a_sw (`CALIB_BOUND_HI`), a 36 chwil jest oznaczonych `NIGHT`, gdy kalibracja do pirometru nie ma sygnalu slonecznego.
+
+**Uwagi**
+- Zrodla w `C:\WORK\DOKTORAT\temp_model` bez zmian (kontrola `find -newermt`). W `C:\projects\sql_tsd_fwd` sa pliki nowsze niz 2026-11-13 (`bak\e2bR9_lustro_*`, `logi\E2b\e2bR9_lustro_*`, `plik_wymiany_informacji.md`) — zmienione poza tym narzedziem (inne prace w tamtym projekcie); narzedzie nic tam nie zapisuje (odczyt: `tabele\z14lite_fwd_walidacja_v3.csv`).
+- Wyniki w nocy: kalibracja do pirometru jest nieidentyfikowalna (bramka lub granica); flaga `NIGHT` mowi, ze `a_sw` nie ma tu znaczenia i wynik jest bliski fizyce bez kalibracji.
+- Blad w README (sekwencje `\n`/`\f` w sciezce komendy `fwd_fit`) poprawiony przy okazji.
+
+**Co zostaje:** E5 (instrukcje INSTRUKCJA_N1..N4.md), E2b (tryb `geometry` N4); do ustalenia: Q-N3-14, Q-N3-15, Q-N3-16, `UC_Schema.xsd`, Q-N4-3.
+
+**STOP — decyzja:** brak decyzji blokujacych E5.
