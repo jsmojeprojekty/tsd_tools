@@ -13,7 +13,11 @@ from ..common.config_n4 import N4Config
 
 TABLES = (("agreement", "agreement.csv"), ("groups", "agreement_groups.csv"), ("multiplier", "agreement_ci.csv"),
           ("conditions", "conditions.csv"), ("calibration", "calibration.csv"), ("nulls", "null_checks.csv"),
-          ("null_delta", "null_delta.csv"), ("conversion", "conversion.csv"), ("pairs", "pairs_corrected.csv"))
+          ("null_delta", "null_delta.csv"), ("conversion", "conversion.csv"), ("pairs", "pairs_corrected.csv"),
+          # tryb geometry: tabele posrednie (kandydaci na pary, polozenie plyty FWD, przejscia TSD, os, pary zerowe, sesje, ciagi)
+          ("geo_pairs", "geometry_pairs.csv"), ("geo_fwd", "fwd_plate_positions.csv"), ("geo_passes", "tsd_passes.csv"),
+          ("geo_corridors", "corridors.csv"), ("geo_nulls", "geometry_null_pairs.csv"),
+          ("geo_sessions", "fwd_sessions.csv"), ("geo_runs", "fwd_session_runs.csv"))
 
 
 def _target(path: Path, overwrite: bool) -> Path:
@@ -42,7 +46,7 @@ def write_html(result: dict, path: Path) -> None:
                     "sd_log_ratio", "pearson_r", "spearman_rho", "ccc", "deming_loglog_slope", "r_within_session"]
     parts = [
         "<html><head><meta charset='utf-8'><title>tsd_fwd_compare</title></head><body>",
-        "<h1>Porownanie TSD-FWD (tryb pairs)</h1>",
+        f"<h1>Porownanie TSD-FWD (tryb {html.escape(str(m.get('mode', 'pairs')))})</h1>",
         f"<p>Pary: {m['n_pairs']} (wazne: {m['n_valid_pairs']}), sesji FWD: {m['n_sessions']}; "
         f"pary z T12 poza zakresem lub bez T12: {m['n_t12_outside_or_missing']}. beta D0 = {m['beta_pct_used']:.5f} %/C.</p>",
         f"<p>{html.escape(m['note'])}</p>",
@@ -64,7 +68,7 @@ def write_n4(cfg: N4Config, result: dict) -> list:
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
     for key, name in TABLES:
-        df = result[key]
+        df = result.get(key)
         if df is None or (hasattr(df, "empty") and df.empty):
             continue
         p = _target(out_dir / name, cfg.output.overwrite)

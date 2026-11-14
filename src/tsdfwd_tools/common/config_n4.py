@@ -91,11 +91,64 @@ class N4Nulls:
 
 
 @dataclass
+class N4TsdColumns:
+    run_id: str = "run_id"                   # kolumna przejazdu; gdy jej brak w pliku: nazwa pliku (bez sufiksu _rows)
+    chainage: str = "chainage_m"             # pikietaz pliku (SUROWY, rosnacy z jazda); lag -4,8 m N4 stosuje sam
+    lat: str = "lat"
+    lon: str = "lon"
+    d0: str = "d0"                           # d0 TSD [um] z eksportu B_1510off (bez korekty temperaturowej)
+    gof: str = "gof"
+    t12: str = "t12_c"                       # temperatura warstwy 12 cm (z N2)
+    speed: str = "speed_kmh"
+
+
+@dataclass
+class N4FwdColumns:
+    station_id: str = "station_id"
+    session: str = "session_id"
+    station_m: str = "station_m"             # dystansomierz FWD (km albo m — jednostka wykrywana z danych)
+    lat: str = "latitude"
+    lon: str = "longitude"
+    time: str = "measured_at"
+    device: str = "device"                   # aparat (trailer), np. 8002-367
+    date: str = "date"                       # data pomiaru RRRR-MM-DD (do reguly anteny i roku)
+    heading: str = "heading_deg"             # opcjonalnie: kurs geograficzny (zwiekszy odrzucanie przeciwnego kierunku)
+    d0: str = "D0"                           # D0 FWD [um] znormalizowane do 50 kN, BEZ korekty temperaturowej (z N1)
+    t12: str = "t_mid_c"                     # temperatura warstwy po stronie FWD (z N1/N2)
+    in_concrete_zone: str = "in_concrete_zone"
+
+
+@dataclass
+class N4Geometry:
+    tsd_rows: list = field(default_factory=list)         # pliki CSV z wierszami TSD (np. *_rows.csv z N3 z rows_csv: true)
+    tsd_runs_csv: str | None = None                      # opcjonalnie: run_id, date [, calib_interval, data_tier, recorder_group]
+    fwd_stations_csv: str = ""
+    corridors_csv: str | None = None                     # gotowa os (corridor_id, s, x_2180, y_2180, heading_deg); domyslnie z przejazdow TSD
+    tsd_columns: N4TsdColumns = field(default_factory=N4TsdColumns)
+    fwd_columns: N4FwdColumns = field(default_factory=N4FwdColumns)
+    lag_m: float = -4.8                                  # lag polozenia ugiec TSD wzgledem GPS (konwencja E0-C), +-1,5 m
+    antenna: list = field(default_factory=list)          # reguly anteny: [{device, d_m, era, confirmed, from, until}]; puste = P043b
+    sigma_era: dict = field(default_factory=dict)        # nadpisanie sigma_era [m] (era -> wartosc)
+    eps_variant: str = "short_zero"                      # short_zero | full
+    axis: dict = field(default_factory=dict)             # nadpisanie progow osi (AxisParams)
+    calib_intervals: dict = field(default_factory=lambda: {
+        "K2024-03-01": ["2024-03-01", "2025-05-26"], "K2025-05-27": ["2025-05-27", "2026-05-18"],
+        "K2026-05-19": ["2026-05-19", "2099-12-31"]})
+    layers: list = field(default_factory=lambda: ["A", "B"])
+    same_year_only: bool = True
+    require_valid_d0: bool = True                        # tylko pary z waznym d0 po obu stronach (okno >= min_rows wierszy)
+    window_m: float = 5.0                                # polowka okna wartosci TSD (W5)
+    min_rows: int = 3
+    date_override: str | None = None                     # data wspolna dla wszystkich przejazdow TSD (gdy brak jej w nazwie/pliku)
+
+
+@dataclass
 class N4Config:
     tool: str = "tsd_fwd_compare"
     schema_version: int = 1
     mode: str = "pairs"
     log_level: str = "INFO"
+    geometry: N4Geometry = field(default_factory=N4Geometry)
     input: N4Input = field(default_factory=N4Input)
     correction: N4Correction = field(default_factory=N4Correction)
     measures: N4Measures = field(default_factory=N4Measures)
@@ -111,10 +164,26 @@ def build_n4_config(data: dict, base_dir=".") -> N4Config:
     cfg = _build(N4Config, data, "config")
     cfg.base_dir = str(base_dir)
     _choice(cfg.tool, ("tsd_fwd_compare", "n4"), "tool")
-    if cfg.mode != "pairs":
-        raise ConfigError("mode: dostepny jest tylko tryb 'pairs' (tryb 'geometry' w etapie E2b)")
-    if not cfg.input.pairs_csv:
+    _choice(cfg.mode, ("pairs", "geometry"), "mode")
+    if cfg.mode == "pairs" and not cfg.input.pairs_csv:
         raise ConfigError("input.pairs_csv: podaj plik z parami TSD-FWD")
+    if cfg.mode == "geometry":
+        g = cfg.geometry
+        if not g.tsd_rows:
+            raise ConfigError("geometry.tsd_rows: podaj co najmniej jeden plik CSV z wierszami TSD")
+        if not g.fwd_stations_csv:
+            raise ConfigError("geometry.fwd_stations_csv: podaj plik CSV ze stacjami FWD")
+        _choice(g.eps_variant, ("short_zero", "full"), "geometry.eps_variant")
+        for ly in g.layers:
+            _choice(ly, ("A", "B", "C", "X"), "geometry.layers")
+        if g.window_m <= 0 or g.min_rows < 1:
+            raise ConfigError("geometry.window_m > 0 oraz geometry.min_rows >= 1")
+        for rule in g.antenna:
+            if not isinstance(rule, dict) or not {"device", "d_m"} <= set(rule):
+                raise ConfigError("geometry.antenna: kazda regula to slownik z kluczami device, d_m [, era, confirmed, from, until]")
+        for name, rng in g.calib_intervals.items():
+            if len(rng) != 2:
+                raise ConfigError(f"geometry.calib_intervals.{name}: oczekiwano [od, do] (RRRR-MM-DD)")
     for t in cfg.correction.treatments + [cfg.correction.main_treatment, cfg.calibration.treatment]:
         _choice(t, ("none", "main_after", "k02"), "correction")
     if cfg.correction.main_treatment not in cfg.correction.treatments:

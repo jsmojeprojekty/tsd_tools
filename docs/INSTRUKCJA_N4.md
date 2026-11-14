@@ -1,4 +1,4 @@
-# Instrukcja N4 — `tsd_fwd_compare` (porownanie TSD z FWD, tryb `pairs`)
+# Instrukcja N4 — `tsd_fwd_compare` (porownanie TSD z FWD)
 
 Dla inzynierow Zakladu Diagnostyki Nawierzchni. Metoda: raport PW.S-1063 (Etap II), p. 6.2-6.3 i 7.3.
 
@@ -7,8 +7,7 @@ Ocenia zgodnosc D0 z TSD i z FWD na **gotowych parach** punktow, po sprowadzeniu
 przedzialy niepewnosci, wplyw warunkow (aparat, kalibracja, odstep czasu, GoF), kontrole zerowe oraz funkcje przeliczajaca
 (mnoznik TSD → FWD) z ocena poza proba.
 
-Tryb `pairs` zaklada, ze pary zostaly zbudowane wczesniej. **Budowania par z geometrii (odcinki, antena FWD, rzut na os drogi)
-w tym wydaniu nie ma** (tryb `geometry`, etap E2b). Konfiguracja z `mode: geometry` konczy sie bledem.
+Dwa tryby wejscia: `pairs` (gotowe pary, p. 3) i `geometry` (N4 sam buduje pary z geometrii, p. 3a). Dalsza analiza jest taka sama.
 
 ## 2. Zasady, ktorych narzedzie pilnuje
 - Pary sa tylko **geometryczne**. Zadnego wyboru rekordu TSD wedlug wartosci FWD (to dawaloby sztucznie dobra zgodnosc).
@@ -25,6 +24,45 @@ Plik CSV par (`input.pairs_csv`), jeden wiersz = jedna para, z kolumnami (nazwy 
 `device`, `calib_interval`, `dt_days`, `win5_gof05_share`, `corridor_id`, `fwd_station_id`, `tsd_year`, `era`, `fwd_measured_at_local`.
 Temperatury i dodatkowe kolumny mozna dolaczyc z osobnych plikow po `pair_id`: `input.t12_csv`, `input.meta_csv`.
 Opcjonalnie: `input.null_pairs_csv` — wartosci TSD dla par zerowych (`pair_id`, `null_type`, `d0_w5`, `d0_valid_w5`).
+
+## 3a. Tryb `geometry` — pary z geometrii
+```bash
+C:\ENV
+arzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs
+4_geometry_example.yaml
+```
+**Wejscie**
+- Wiersze TSD (`geometry.tsd_rows`): CSV z kolumnami `chainage_m` (SUROWY pikietaz pliku, niemalejacy), `lat`, `lon`, `d0` (B_1510off, um),
+  `gof`, `t12_c` (temperatura warstwy z N2), opcjonalnie `speed_kmh`. Wygodnie: `*_rows.csv` z N3 (`output.rows_csv: true`). Nie podawaj
+  `pos_m` ani pikietazu po przesunieciu — lag polozenia ugiec (-4,8 m) N4 stosuje sam, dokladnie raz.
+- Data przejazdu TSD: z `geometry.tsd_runs_csv` (`run_id`, `date`), z nazwy pliku (`T4RRRRMMDDnnnn`) albo z `geometry.date_override`.
+  Brak daty to blad. Przedzial kalibracji TSD (`calib_interval`) wynika z daty i tabeli `geometry.calib_intervals`.
+- Stacje FWD (`geometry.fwd_stations_csv`): jeden wiersz = jedna stacja; `station_id`, `session_id`, `station_m` (dystansomierz; km albo m —
+  jednostka wykrywana z danych), `latitude`, `longitude`, `device` (aparat, np. 8002-367), `date`, `D0` (um, 50 kN, bez korekty temperaturowej,
+  z N1), `t_mid_c` (temperatura warstwy po stronie FWD). Opcjonalnie `heading_deg` (brak: kurs z kolejnosci stacji w sesji), `time`.
+  Nazwy kolumn mozna zmienic w `geometry.fwd_columns` / `geometry.tsd_columns`.
+
+**Co N4 robi**
+1. Buduje os pasa (korytarz) z przejazdow TSD (albo bierze gotowa z `geometry.corridors_csv`) i przypisuje wiersze TSD: `s_ref` (pozycja
+   wzdluz osi) i `lateral_m` (odleglosc poprzeczna, + = w lewo od kierunku jazdy).
+2. Rzutuje antene FWD na os, wyznacza kierunek sesji **z danych** (nie z pola kursu), przesuwa antene przed plyte wg tabeli regul aparatu
+   (`geometry.antenna`; domyslnie 8002-367: 5,5 m do 2025-10-09, potem 0; 8082-119: 1,0 m; 8002-369: 1,0 m, niepotwierdzone) i wygladza polozenie
+   regresja dystansomierza. Wynik: `s_fwd` i niepewnosc polozenia `sigma_long`.
+3. Dla kazdej stacji i kazdego przejazdu TSD na tym samym korytarzu (ten sam rok) tworzy pare; okno wartosci to wiersze z |s_ref − s_fwd| <= 5 m
+   (co najmniej 3 z waznym d0), wartosc = mediana d0. Warstwa jakosci polozenia: A (|dlat| <= 1,0 m i sigma_long <= 1,0 m), B (1,75 m / 2,5 m),
+   C (sigma_long <= 5 m), X (reszta). Do porownania wchodza warstwy z `geometry.layers` (domyslnie A i B).
+4. Tworzy pary zerowe (to samo FWD, wiersze TSD z tego samego przejazdu ±200 m dalej i losowe >= 300 m dalej; seed 20261017) do kontroli zerowej.
+
+**Dodatkowe wyniki**: `geometry_pairs.csv` (wszyscy kandydaci z warstwami i oknami), `fwd_plate_positions.csv` (polozenie plyty i `sigma_long` dla stacji),
+`tsd_passes.csv`, `corridors.csv`, `geometry_null_pairs.csv`, `fwd_sessions.csv` (kierunek i jednostka dystansomierza na sesje),
+`fwd_session_runs.csv` (ciagi stacji i dopasowanie dystansomierza). W `meta.json` sekcja `geometry` zawiera uzyte reguly anteny i `sigma_era`.
+
+**Czego ten tryb nie robi (jeszcze)**
+- Nie wykrywa odcinkow wspolnych wg Tab. 3.2 ani nie robi raportu „linia do linii”; pary wynikaja z wspolnego korytarza i roku, nie z odcinkow.
+- `s_ref` pochodzi z GPS (bez wyrownania profilem, bez scalania duplikatow pasa). Os z przejazdow TSD zalezy od zestawu przejazdow — ta sama droga
+  z innym zestawem plikow moze dac troche inne `s_ref`; dla powtarzalnosci podaj gotowa os w `geometry.corridors_csv`.
+- Przejazdy z wieloma pasami jednej jezdni wymagaja czytelnych przejazdow w obu pasach (korytarze rozdzielane sa przy rozstawie > 1,75 m
+  i kursie > 30 stopni).
 
 ## 4. Uruchomienie
 ```bash
@@ -66,7 +104,7 @@ Opcje: `--dry-run`, `--out-dir`, `--log-level`, `--strict`. Obliczenia z `replic
 - Pary z T12 poza 5-30 C albo bez T12 sa oznaczone i policzone w `meta.json`; nie sa cicho wykluczane z calosci wnioskow.
 
 ## 8. Ograniczenia i punkty otwarte
-- Tylko tryb `pairs`; pary z geometrii (E2b) w kolejnym etapie. Przy budowie par geometrycznych polozenie TSD jest przesuniete
+- Przy budowie par geometrycznych (tryb `geometry`) polozenie TSD jest przesuniete
   o −4,8 m (lag, +- 1,5 m): korekta jest wliczona raz, przy wyznaczaniu `s_ref` TSD; nie wolno jej dokladac drugi raz do okien.
 - Korelacja wewnatrz sesji par zerowych dla wariantu **bez korekty** nie jest w pelni odtwarzalna (inna definicja okna w skrypcie zrodlowym);
   test zostal oznaczony jako oczekiwane niepowodzenie (`xfail`) w testach pakietu — nie wplywa to na wyniki par skorygowanych.

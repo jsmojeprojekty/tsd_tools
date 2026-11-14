@@ -81,7 +81,13 @@ def _t12_flags(df: pd.DataFrame, lo: float, hi: float) -> np.ndarray:
 
 
 def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
-    df, files = load_pairs(cfg)
+    geo = None
+    if cfg.mode == "geometry":
+        from .geometry_pipeline import build_geometry_pairs
+        geo = build_geometry_pairs(cfg)
+        df, files = geo["pairs"], geo["files"]
+    else:
+        df, files = load_pairs(cfg)
     m, c, u = cfg.measures, cfg.correction, cfg.uncertainty
     beta_pct = default_beta_pct() if c.beta_pct is None else c.beta_pct
     sess = df["session"].to_numpy()
@@ -166,18 +172,24 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
     # --- kontrola zerowa ---
     null_rows, null_delta = [], []
     inp = cfg.input
-    if inp.null_pairs_csv:
+    nd = None
+    null_type_col, null_tsd_col, null_valid_col = inp.null_type_col, inp.null_tsd_col, inp.null_valid_col
+    if geo is not None:
+        nd = geo["nulls"]
+        null_type_col, null_tsd_col, null_valid_col = "null_type", "d0_w5", "d0_valid_w5"
+    elif inp.null_pairs_csv:
         npath = resolve_path(inp.null_pairs_csv, cfg.base_dir)
         if not npath.is_file():
             raise FileNotFoundError(f"brak pliku par zerowych: {npath}")
         nd = pd.read_csv(npath, encoding="utf-8-sig")
         files["null_pairs_csv"] = str(npath)
+    if nd is not None and len(nd):
         real_row = agreement_row(main_f, main_t, sess, m.lambda_d0, cfg.null_checks.n_boot,
                                  {"pair_kind": "real"}, cfg.null_checks.seed)
         null_rows.append(real_row)
-        for nt in sorted(nd[inp.null_type_col].dropna().unique()):
-            tn = align_null(df.assign(pair_id=df["pair_id"]), nd, nt, inp.null_type_col, inp.null_tsd_col,
-                            inp.null_valid_col, "pair_id").to_numpy(float)
+        for nt in sorted(nd[null_type_col].dropna().unique()):
+            tn = align_null(df.assign(pair_id=df["pair_id"]), nd, nt, null_type_col, null_tsd_col,
+                            null_valid_col, "pair_id").to_numpy(float)
             f_n, t_n = correct_pair_values(fwd0, tn, df["fwd_t12"], df["tsd_t12"], c.main_treatment, beta_pct, c.t_ref_c)
             null_rows.append(agreement_row(f_n, t_n, sess, m.lambda_d0, cfg.null_checks.n_boot,
                                            {"pair_kind": nt}, cfg.null_checks.seed))
@@ -193,7 +205,7 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
     pairs_out[f"tsd_{c.main_treatment}"] = main_t
 
     meta = {
-        "tool": "tsd_fwd_compare", "mode": "pairs", "version": __version__,
+        "tool": "tsd_fwd_compare", "mode": cfg.mode, "version": __version__,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "inputs": {k: {"file": v, "md5": _md5(Path(v))} for k, v in files.items()},
         "config": {"correction": asdict(c), "measures": asdict(m), "uncertainty": asdict(u),
@@ -210,6 +222,10 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
     result = {"agreement": agreement, "groups": groups_df, "multiplier": multiplier, "conditions": conditions,
               "calibration": calib, "nulls": nulls, "null_delta": null_delta_df, "pairs": pairs_out,
               "conversion": pd.DataFrame([conversion]), "before_after": before_after, "meta": meta, "outputs": []}
+    if geo is not None:
+        meta["geometry"] = geo["meta"]
+        meta["geometry"]["config"] = asdict(cfg.geometry)
+        result.update(geo["tables"])
     if not dry_run:
         from .output import write_n4
         result["outputs"] = write_n4(cfg, result)

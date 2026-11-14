@@ -1,6 +1,6 @@
 """Wiersz polecen: python -m tsdfwd_tools <narzedzie> --config plik.yaml
 
-Narzedzia: fwd_tempcorr (n1), fwd_fit, layer_temp (n2), tsd_network (n3), tsd_fwd_compare (n4, tryb pairs)."""
+Narzedzia: fwd_tempcorr (n1), fwd_fit, layer_temp (n2), tsd_network (n3), tsd_fwd_compare (n4, tryby pairs i geometry)."""
 
 from __future__ import annotations
 

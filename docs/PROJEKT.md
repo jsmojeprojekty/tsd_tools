@@ -287,7 +287,7 @@ def fit_multiplier(...); def fit_affine(...); def leave_one_group_out(fit_fn, gr
 def estimate_lambda(tsd_repeat_pairs, fwd_repeat_pairs) -> LambdaResult                                                 # sigma_TSD, sigma_FWD, lambda
 def run_n4(cfg: N4Config) -> N4Result
 ```
-Tryb `pairs` obowiazkowy w E2; tryb `geometry` (przeniesienie `e1_sref` + `e2b1_geometry` + `e2b1_pairs` + `detect_sections`, ok. 3500 linii) — warunkowo, po decyzji Q-N4-4.
+Tryb `pairs` obowiazkowy w E2; tryb `geometry` (przeniesienie `e1_sref` + `e2b1_geometry` + `e2b1_pairs`) wdrozony w E2b (moduly `compare\geo.py`, `fwd_position.py`, `pairing.py`, `geometry_pipeline.py`; `detect_sections`, wyrownanie profilem i scalanie duplikatow pasa — E2c, patrz DZIENNIK).
 
 ---------------------------------------------------------------------------------------------------
 
@@ -345,8 +345,12 @@ Legenda: tolerancja 0,01 w jednostce wielkosci, chyba ze podano inaczej. `@refer
 | T-N4-08 | Kalibracja mnoznika, LOSO (k02) | a 1,4222; MAE 27,6747; LOSO MAE 27,7366; mediana abs log 0,227208 / 0,227888 | 0,01 | @reference |
 | T-N4-09 | Lambda d0 | 0,11787 (sigma_TSD 0,296408; sigma_FWD 0,101763; n 2015/128) | 1e-4 | @reference (z gotowych `e2b2_lambda.csv`; test estymatora: syntetycznie) |
 | T-N4-10 | Syntetyczne: Deming (a=1,3, b=-0,15, sx 0,10, sy 0,18), CCC (bias 2), BA (bias 2, SD 0), pokrycie CI dla 5/15/35/73 klastrow | wg `test_e2b2.py`, `test_e2x_uncertainty.py` | 0,05/0,08; pokrycie 95 % +-3 pp | @unit |
-| T-N4-11 | Geometria (tryb B, jesli w zakresie): `detect_sections` z progami Tab. 3.2 na danych v4 | 445 sekcji; 167 `confirmed`; recall/precision wzgledem 167 | wg decyzji | @reference (E2b) |
-| T-N4-12 | Zgodnosc z `e1`/`e2b1` testami syntetycznymi (to_2180, kierunek odwrocony, podzial ciagow, warstwy A/B/C/X, pary zerowe) | wg `test_e1.py`, `test_e2b1.py` | wg zrodla | @unit |
+| T-N4-11 | Geometria (tryb B, jesli w zakresie): `detect_sections` z progami Tab. 3.2 na danych v4 | 445 sekcji; 167 `confirmed`; recall/precision wzgledem 167 | wg decyzji | @reference (E2c — jeszcze nie wdrozone) |
+| T-N4-12 | Zgodnosc z `e1`/`e2b1` testami syntetycznymi (to_2180, kierunek odwrocony, podzial ciagow, warstwy A/B/C/X, pary zerowe) | wg `test_e1.py`, `test_e2b1.py` | wg zrodla | @unit (E2b: `test_geo.py`, `test_geometry_pairs.py`) |
+| T-N4-13 | Polozenie plyty FWD, 46826 stacji `odcinki` vs `fwd_plate_position_e2b` | `s_fwd`, `sigma_long`, `era`, `pos_source`, `direction`, `run_id` | 1e-6 (sigma_long 1e-4) | @reference (E2b) |
+| T-N4-14 | Kandydaci na pary i pary zerowe, korytarze 0..29 (prefiks `pair_id` 1..5632) vs `golden_pair_candidates`, `e2b1_null_map` | 5632 par; 16659 par zerowych; seed 20261017 | 1e-6 | @reference (E2b) |
+| T-N4-15 | Przypisanie wierszy TSD do korytarzy (`prepare_run` + `assign_run`) vs `tsd_sref` | korytarz > 99,95 %; `s_ref_gps` 0,02 m; `lateral_m` 0,003 m | jw. | @reference (E2b) |
+| T-N4-16 | Mediana d0 w oknie W5 po `s_ref` vs `d0_tsd` Z15 | >= 99 % par zgodnych < 1e-6 (2888/2895 dla korytarzy 0..80) | 1e-6 | @reference (E2b; roznice = definicja okna S-N4-4) |
 
 ### 6.3 N3 (E3)
 | ID | Test | Wartosc referencyjna | Tolerancja | Zrodlo |
@@ -418,7 +422,7 @@ Kolejnosc E2 (N4) przed E3 (N3) i E4 (N2) wynika z promptu; zalezy od niej, ze N
 - **Q-N4-1 Pary zerowe — kanoniczne wartosci r w obrebie sesji.** lustro P071: 0,155 / 0,135 / 0,096; przeliczenie z `e2b2_null_values` i `e2b2b`: 0,114-0,118 / 0,134-0,141 / 0,023-0,027. Hipoteza: rozna definicja okna (zakres `tsd_id` vs po `s_ref`). Ktore sa kanoniczne dla testu T-N4-05? Do czasu decyzji test = `xfail`.
 - **Q-N4-2 Regula anteny FWD i granica daty.** Domyslnie P043b (8002-367: d=5,5 m do 2025-10-09, potem 0), nie `e1_sref` (5,0 m od 2025-01-01). Zgoda?
 - **Q-N4-3 Korekta -4,8 m.** Czy `tsd_position_offset` jest juz wliczona w `s_ref` i okna W5; konwencja znaku. Do ustalenia przed trybem `geometry`. **ROZSTRZYGNIETE 2026-11-14 (z kodu zrodlowego, potwierdzone przez Jacka):** korekta jest wliczona w `tsd_sref` (`e1_sref.py`, `corrected_xy` z lagiem -4,8 m przy budowie `s_ref`), wiec okna W5 po `s_ref` ja zawieraja i w trybie `geometry` stosuje sie ja dokladnie raz (nie dokladac do `s_ref`). Konwencja znaku (lag E0-C): wiersz o pikietazu s dostaje polozenie GPS z `s - lag` = `s + 4,8 m`; punkt pomiaru lezy 4,8 m dalej wzdluz toru niz GPS tego samego wiersza. N3 (brak `s_ref`): `processing.position_offset_m` domyslnie 0 (decyzja Jacka), opcja w konfiguracji w tej samej konwencji (`pos = pikietaz - position_offset_m`; wpisac -4,8 dla korekty).
-- **Q-N4-4 Zakres trybu `geometry`.** Tryb `pairs` (gotowe pary + T12) w E2 na pewno. Pelny tryb `geometry` (ok. 3500 linii: korytarze, polozenie plyty, kandydaci, `detect_sections`) — w E2 czy odlozyc do E2b (osobny krok po zatwierdzeniu)? Proponuje: najpierw `pairs`, potem `geometry` jako E2b.
+- **Q-N4-4 Zakres trybu `geometry`.** *(ROZSTRZYGNIETE 2026-11-14: `pairs` w E2, `geometry` w E2b — korytarze, polozenie plyty, kandydaci, pary zerowe, wartosci okien; `detect_sections`, wyrownanie profilem i scalanie duplikatow pasa przeniesione do E2c.)* Tryb `pairs` (gotowe pary + T12) w E2 na pewno. Pelny tryb `geometry` (ok. 3500 linii: korytarze, polozenie plyty, kandydaci, `detect_sections`) — w E2 czy odlozyc do E2b (osobny krok po zatwierdzeniu)? Proponuje: najpierw `pairs`, potem `geometry` jako E2b.
 - **Q-N4-5 sigma_FWD i lambda.** Domyslnie lambda d0 = 0,11787 (sigma_TSD 0,296408 z par przejazdow w binach po `s_ref`; sigma_FWD 0,101763 z `e12_lambda`); `katalog_produktow.md` zabrania 0,09. Estymator lambda w narzedziu dla nowych danych — czy wlaczyc, czy lambda tylko z konfiguracji?
 - **Q-N4-6 Warunek "aparat x okres kalibracji TSD".** Zrodlo uzywa `tsd_year`; raport wymaga `calib_interval` (K2024-03-01, K2025-05-27, K2026-05-19). Domyslnie `calib_interval` + `device`; ujemne dt raportowane osobno.
 - **Q-N4-7 Zrodlo T12.** W E2 test czyta `Z15_temperatury_par.csv` z DOKTORAT (tylko odczyt). W produkcji T12 po obu stronach z N2. Zgoda na taka kolejnosc?

@@ -1,0 +1,46 @@
+# N4 tsd_fwd_compare, tryb geometry: pary TSD-FWD budowane z geometrii (wspolna os pasa, polozenie plyty FWD, okna +-5 m po s_ref).
+# Uruchomienie: python -m tsdfwd_tools tsd_fwd_compare --config configs\n4_geometry_example.yaml
+tool: tsd_fwd_compare
+schema_version: 1
+mode: geometry
+
+geometry:
+  # Wiersze TSD: *_rows.csv z N3 (output.rows_csv: true; kolumny chainage_m, lat, lon, d0, gof, t12_c, speed_kmh).
+  # Pikietaz MUSI byc surowy (chainage_m, nie pos_m): lag polozenia -4,8 m N4 stosuje sam, dokladnie raz.
+  tsd_rows:
+    - "D:/wyniki/n3/T4202507200001_rows.csv"
+  tsd_runs_csv: null              # opcjonalnie: run_id, date [, calib_interval, data_tier, recorder_group]; domyslnie data z nazwy pliku
+  # Stacje FWD: jedna stacja = jeden wiersz. Wymagane kolumny (nazwy mozna zmienic w geometry.fwd_columns):
+  # station_id, session_id, station_m (km albo m), latitude, longitude, device, date, D0 (um, 50 kN, bez korekty T), t_mid_c.
+  fwd_stations_csv: "D:/wyniki/n1/stacje_fwd_z_aparatem.csv"
+  corridors_csv: null             # gotowa os (corridor_id, s, x_2180, y_2180, heading_deg); domyslnie z przejazdow TSD
+  lag_m: -4.8                     # lag polozenia ugiec TSD (konwencja E0-C): punkt pomiaru 4,8 m dalej niz GPS wiersza
+  eps_variant: short_zero         # dystansomierz FWD: eps = 0 dla ciagow < 1 km lub < 10 stacji (P043b)
+  # reguly anteny: puste = domyslne P043b (8002-367: 5,5 m do 2025-10-09, potem 0; 8082-119: 1,0 m; 8002-369: 1,0 m, niepotwierdzone)
+  antenna: []
+  # przyklad wlasnej tabeli:
+  # antenna:
+  #   - {device: "8002-367", d_m: 5.5, era: old, confirmed: 1, until: "2025-10-09"}
+  #   - {device: "8002-367", d_m: 0.0, era: new, confirmed: 1, from: "2025-10-09"}
+  layers: [A, B]                  # warstwy jakosci polozenia FWD wchodzace do porownania
+  same_year_only: true            # ten sam rok kalendarzowy FWD i TSD (inaczej +-1 rok, flagowane kolumna same_year)
+  require_valid_d0: true          # tylko pary z waznym d0 po obu stronach (okno TSD >= min_rows wierszy)
+  window_m: 5.0                   # polowka okna wartosci TSD (W5)
+  min_rows: 3
+
+correction:
+  treatments: [none, main_after]
+  main_treatment: main_after
+measures:
+  lambda_d0: 0.11786960020790811
+  n_boot: 1000
+uncertainty:
+  methods: [session_bootstrap, wild_cluster_webb, cr2]
+  replicates: 9999
+conditions:
+  group_by: [device, calib_interval]
+calibration:
+  treatment: main_after
+output:
+  dir: "../wyniki/n4_geometry_example"
+  overwrite: true

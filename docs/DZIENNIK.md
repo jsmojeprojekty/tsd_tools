@@ -259,3 +259,39 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 **Co zostaje:** E2b (tryb `geometry` N4: odcinki, regula anteny P043b, `s_ref`, pary zerowe); do ustalenia: `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16, potwierdzenie `SCI_SUB`.
 
 **STOP — decyzja:** brak decyzji blokujacych E2b.
+
+## 2026-11-14 — E2b: N4 tryb `geometry` (os pasa, polozenie plyty FWD, pary geometryczne i zerowe)
+
+**Co zrobiono**
+- `compare\geo.py` (EPSG:2180, lag polozenia, korytarze, rzut na korytarz, ciagi, os z przejazdow TSD), `comparewd_position.py` (K1-K4: rzut anteny, kierunek sesji z danych, regula anteny jako jawna tabela, ciagi i regresja dystansomierza, `sigma_long`), `compare\pairing.py` (kandydaci na pary, okna +-1/2,5/5 m, warstwy A/B/C/X, pary zerowe, wartosci okien), `compare\geometry_pipeline.py` (potok trybu), integracja z `run_n4` (`mode: geometry`), `configs
+4_geometry_example.yaml`. Nowe wyjscia: `geometry_pairs.csv`, `fwd_plate_positions.csv`, `tsd_passes.csv`, `corridors.csv`, `geometry_null_pairs.csv`, `fwd_sessions.csv`, `fwd_session_runs.csv`.
+- Wejscie trybu: wiersze TSD (np. `*_rows.csv` z N3: surowy `chainage_m`, `lat`, `lon`, `d0`, `gof`, `t12_c`) i stacje FWD (CSV: `station_id`, `session_id`, `station_m`, `latitude`, `longitude`, `device`, `date`, `D0`, `t_mid_c`; D0 i T z N1). Wynik wchodzi do tej samej analizy co tryb `pairs`.
+- Q-N4-3 zastosowane: lag -4,8 m stosowany dokladnie raz (przy budowie polozenia TSD; konwencja `pozycja = pikietaz - lag`); N4 nie przyjmuje pikietazu po przesunieciu. Q-N4-2: regula anteny P043b jako domyslna tabela, nadpisywalna w konfiguracji (jedna regula zamiast dwoch rozbieznych w zrodle). Q-N4-4: tryb `geometry` zrobiony po zatwierdzeniu E2.
+- Decyzje implementacyjne bez zmiany metod: (1) wartosci okien TSD liczone po `s_ref` (jedna definicja, S-N4-4, decyzja E0), a nie po zakresie `tsd_id` (patrz nizej); (2) kurs stacji FWD, gdy brak kolumny `heading_deg`, liczony z kolejnosci stacji w sesji jak `compute_headings` w bazie; (3) data przejazdu TSD z `geometry.tsd_runs_csv`, nazwy pliku (`T4RRRRMMDDnnnn`) albo `geometry.date_override` — brak daty to blad; przedzial kalibracji TSD z konfigurowalnej tabeli dat (domyslnie K2024-03-01, K2025-05-27, K2026-05-19); (4) filtr par jak w tabeli glownej raportu: warstwy A+B, ten sam rok, wazne d0 po obu stronach.
+
+**Co sprawdzono (220 testow zielonych + 2 `xfail` z E2; nowe: 14 geo, 9 stacje/pary, 5 potok geometry, 4 regresji)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| T-N4-12 testy syntetyczne zrodla (`test_e1.py` T1-T7, `test_e2b1.py` T1-T5, T11): poludnik srodkowy, symetria, skala, zbieznosc, lag, plyta, rzut i znak `lateral`, ciagi, korytarze, wygladzenie osi, regresja dystansomierza, pary zerowe | zgodne | wg zrodla | OK |
+| T-N4-13 polozenie plyty FWD, 46826 stacji `odcinki` vs `fwd_plate_position_e2b` (K1-K4): `lane_match`, `era`, `pos_source`, `direction`, `corridor_id`, `run_id` | 100 % zgodne | 0 | OK |
+| T-N4-13 `s_ant`, `lat_ant`, `s_plate_gps`, `s_dmi`, `s_fwd`, `residual_gps_m`, `sigma_a` | max roznica 2,9e-10 m | tol. 1e-6 | OK |
+| T-N4-13 `sigma_long` | max roznica 2,0e-6 m (zaokraglenie sigma_era w tabeli) | tol. 1e-4 | OK |
+| T-N4-14 kandydaci na pary, korytarze 0..29 (5632 pary = prefiks `pair_id`): ten sam zestaw i kolejnosc, `win1/2_5/5_n`, zakresy `tsd_id`, `layer`, `dt_days`, `same_year`, `calib_interval` | 100 % zgodne | 0 | OK |
+| T-N4-14 `s_fwd`, `ds`, `dlat`, `win5_gof05_share`, `win5_lat_tsd_median`, `v_med`; `sigma_long_fwd` | max 8,7e-11; `sigma_long_fwd` 2,0e-6 | tol. 1e-6 / 1e-4 | OK |
+| T-N4-14 pary zerowe (+-200 m, permutacja z seedem 20261017): 16659 wierszy | liczba, `center_s` (max 8,7e-11), `win5_n`, zakresy `tsd_id` zgodne | 0 | OK |
+| T-N4-15 przypisanie wierszy TSD (3 pliki; 15 plikow sprawdzonych recznie) do referencyjnych korytarzy vs `tsd_sref` (`prepare_run` + `assign_run`): korytarz | 99,986-100 % wierszy w pasie | wiersze graniczne | OK |
+| T-N4-15 `s_ref_gps` / `lateral_m` | max 0,010 m / 0,0011 m | wspolrzedne korytarzy w bazie zapisane z dokladnoscia ~mm | OK |
+| T-N4-16 mediana d0 w oknie W5 vs `d0_tsd` Z15 (pary korytarzy 0..29: 335; 0..80: 2895) | 334/335 oraz 2888/2895 zgodnych < 1e-6; obecnosc wartosci zgodna we wszystkich | 7 par roznych (maks. 30,5 um), wyjasnione definicja okna (S-N4-4) | OK (wyjasnione) |
+
+**Czego tryb `geometry` NIE robi (swiadomie, patrz `docs\INSTRUKCJA_N4.md`)**
+- Nie wykrywa wspolnych odcinkow wg Tab. 3.2 (`detect_sections`, raport "linia do linii", flaga `in_stage1`) — pary nie zaleza od odcinkow (wynikaja z korytarzy i roku); odcinki to osobny krok kontrolny, jeszcze niezaimplementowany.
+- `s_ref` = `s_ref_gps`: bez wyrownania profilem (wymaga kanalu `profile1`, ktorego nie ma eksport B_1510off), bez scalania duplikatow pasa i bez drogomierza zakotwiczonego w strefach zlego GPS. Os z przejazdow TSD nie jest identyczna z osia z calej bazy (zalezy od zestawu przejazdow); dla identycznosci mozna podac gotowa os (`geometry.corridors_csv`).
+- Nie liczy lambdy (Q-N4-5) ani nie wybiera rekordu TSD wedlug wartosci.
+
+**Uwagi**
+- Zrodla w `C:\projects\sql_tsd_fwd` bez zmian (kontrola `find -newer`; zadnego `__pycache__`). W `C:\WORK\DOKTORAT\.git` zmienily sie pliki `FETCH_HEAD`/`refs/remotes/origin/HEAD` — nie przez to narzedzie (nie wykonuje zadnych komend git w tamtym katalogu).
+- Roznice 7 z 2895 par (T-N4-16): zrodlowy `e2b2_values` bral wiersze z zakresu `tsd_id` min..max okna, w ktorym moga byc tez wiersze spoza okna odleglosciowego (np. przerwa w przejezdzie); tu okno to wiersze z |s_ref - s_fwd| <= 5 m.
+
+**Co zostaje:** E2c (opcjonalnie): `detect_sections` + raport "linia do linii", wyrownanie profilem i scalanie duplikatow pasa (dla danych z kanalem `profile1`), estymator lambdy (Q-N4-5); do ustalenia: `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16, potwierdzenie `SCI_SUB`.
+
+**STOP — decyzja:** brak decyzji blokujacych; do rozstrzygniecia zakres E2c (patrz wyzej).
