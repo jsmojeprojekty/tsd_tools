@@ -348,3 +348,27 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 
 **STOP — decyzja:** brak decyzji blokujacych.
 
+## 2026-11-14 — E2e: N4 wyrownanie przejazdow profilem podluznym
+
+**Co zrobiono**
+- `compare\align.py`: wyrownanie przejsc korytarza profilem (profil minus mediana biegnaca 101 m; odniesienie = najdluzszy przejazd; bloki ~1 km, przesuniecie z korelacji Pearsona przez FFT w zakresie +-15 m z parabola i wariantem polprobkowym, prog r >= 0,8, odrzut blokow > 3 m od mediany, szablon dla przejsc bez wspolnych blokow, centrowanie na mediane GPS przejsc). Port z `e1_sref` (`align_*`, `delta_fn`, `loo_residuals`, `align_corridor`, krok 2 przebiegu), `e0b_t20_defl` (`block_curve`, `curve_peak`, `running_median_nan`, `resample`), `e0_t20_lag` (`parabola_peak`), `qc_gyro_gps` (`xcorr_pearson`).
+- Integracja z trybem `geometry`: opcjonalna kolumna profilu w wierszach TSD (`geometry.tsd_columns.profile`), `geometry.align: auto | true | false` (domyslnie `auto` = gdy jest profil). `s_ref = s_ref_gps + delta(s)`; okna par, pary zerowe, sekcje i lambda korzystaja z wyrownanego `s_ref` (rama GPS stacji FWD zachowana). Nowe wyjscia: kolumny `align_ref`, `align_note`, `n_blocks*`, `delta_*`, `centering_m`, `loo_*` w `tsd_passes.csv` i `tsd_align_blocks.csv`.
+- Poprawka znaleziona w trakcie: analiza konczyla sie `ZeroDivisionError` przy mniej niz 3 sesjach FWD (przedzialy klastrowe CR2/dzikiego bootstrapu); teraz sa pomijane, gdy sesji jest < 3 (pozostale miary licza sie).
+
+**Co sprawdzono (255 testow zielonych + 2 `xfail`; nowe: 6 syntetycznych, 1 integracyjny, 7 regresji)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| T8 zrodla (`test_e1.py`): odtworzenie przesuniecia 2,3 m i dryftu 0,8 m/km; 20 realizacji (1,3 m, szum 0,1); `align_corridor` na dwoch przejsciach | blad RMS < 0,07 m, maks. wewnatrz < 0,15 m, obciazenie < 0,05 m; delta < 0,12 m | wg zrodla | OK |
+| T-N4-17 korytarze 0, 1, 2, 3, 4, 7, 8 (100 przejsc): zrodlo wyrownania (`reference` / `profile_ref` / `profile_template` / `gps`), liczba blokow i blokow uzytych, notatka `align_note` | 100 % zgodne, 0 niezgodnych przejsc | 0 | OK |
+| T-N4-17 centrowanie korytarza vs `tsd_passes.centering_m` | max roznica 2,1e-5 m | tol. 1e-4 | OK |
+| T-N4-17 `s_ref` vs `tsd_sref` (wiersze bez drogomierza zakotwiczonego) | max roznica 0,0011 m | tol. 0,005 (wspolrzedne korytarzy w bazie ~mm) | OK |
+| test integracyjny: profil drugiego przejazdu przesuniety o 3 m -> roznica delta miedzy przejazdami; tryb auto bez profilu; `align: true` bez profilu = blad | 3,0 +- 0,25 m; zgodne | wg zalozen | OK |
+
+**Uwagi**
+- Wyrownanie dziala na **zbiorze przejazdow podanym na wejsciu**: odniesieniem jest najdluzszy przejazd korytarza w tym zbiorze, wiec `s_ref` jest wzgledny w obrebie zbioru (rama GPS mediany przejsc). Dodanie nowych przejazdow moze zmienic odniesienie i przesunac `s_ref` o ulamki metra; dla powtarzalnosci wynikow miedzy uruchomieniami nalezy podawac stale zbiory przejazdow.
+- Nadal poza zakresem: scalanie duplikatow pasa i drogomierz zakotwiczony w strefach zlego GPS (oba z `e1_sref`).
+
+**Co zostaje:** scalanie duplikatow pasa (`find_merges`/`apply_merges`) i drogomierz w strefach zlego GPS; do ustalenia: `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16, potwierdzenie `SCI_SUB`.
+
+**STOP — decyzja:** brak decyzji blokujacych.
+

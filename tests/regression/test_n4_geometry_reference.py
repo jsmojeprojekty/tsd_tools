@@ -278,3 +278,35 @@ def test_lambda_estimator_reproduces_report_value(sql_root, dbs):
     lam = LAM.lambda_from_sigmas(fwd["sigma_within"], tsd["sigma"])
     assert lam == pytest.approx(ref.lambda_val, abs=1e-9) and lam == pytest.approx(0.11786960020790811, abs=1e-9)
     assert tsd["n_pairs"] == ref.n_pairs_tsd and fwd["n_pairs"] == ref.n_fwd_pairs
+
+
+@pytest.mark.parametrize("cid", [0, 1, 2, 3, 7, 8, 4])
+def test_profile_alignment_reproduces_tsd_sref(dbs, cid):
+    """T-N4-17: wyrownanie przejsc profilem (`align_corridor` + `apply_alignment`) na przejsciach korytarza odtwarza `tsd_passes`
+    (zrodlo wyrownania, liczba blokow, centrowanie) i `s_ref` z `tsd_sref` (7 korytarzy, 100 przejsc; tol. s_ref 5 mm)."""
+    from tsdfwd_tools.compare import align as AL
+    prod, v4 = dbs["prod"], dbs["v4"]
+    tp = pd.read_sql(f"SELECT * FROM tsd_passes WHERE corridor_id = {cid} ORDER BY pass_id", prod).set_index("pass_id")
+    length = prod.execute(f"SELECT length_m FROM ref_corridors WHERE corridor_id = {cid}").fetchone()[0]
+    rows = pd.read_sql(f"SELECT tsd_id, file_id, pass_id, s_ref_gps, s_ref, align_source FROM tsd_sref WHERE corridor_id = {cid} "
+                       "AND pass_id IS NOT NULL ORDER BY tsd_id", prod)
+    files = sorted(rows.file_id.unique())
+    prof = pd.read_sql(f"SELECT tsd_id, file_id, profile1 FROM tsd_measurements WHERE file_id IN ({','.join(map(str, files))}) "
+                       "ORDER BY file_id, tsd_id", v4)
+    det = {}
+    for _, g in prof.groupby("file_id"):
+        det.update(dict(zip(g.tsd_id.to_numpy(), AL.detrend_profile(g.profile1.to_numpy(float)))))
+    rows["prof"] = rows.tsd_id.map(det)
+    passes = [dict(pass_id=int(pid), s=g.s_ref_gps.to_numpy(float), prof=g.prof.to_numpy(float), idx=g.index.to_numpy())
+              for pid, g in rows.groupby("pass_id", sort=True)]
+    cen = AL.align_corridor(passes, float(length))
+    assert cen == pytest.approx(float(tp.centering_m.iloc[0]), abs=1e-4)
+    for p in passes:
+        ref = tp.loc[p["pass_id"]]
+        sref, src, note = AL.apply_alignment(p, cen)
+        assert p["align_ref"] == ref.align_ref and p["n_ok"] == ref.n_blocks_ok and p["n_blocks"] == ref.n_blocks
+        assert note == (None if pd.isna(ref.align_note) else ref.align_note)
+        r = rows.loc[p["idx"]]
+        ok = r.align_source.to_numpy(object) != "odometer_anchor"                 # drogomierz w strefach zlego GPS: poza zakresem
+        assert np.nanmax(np.abs(sref - r.s_ref.to_numpy(float))[ok]) < 0.005
+        assert (src[ok] == r.align_source.to_numpy(object)[ok]).all()

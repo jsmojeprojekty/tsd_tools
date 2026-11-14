@@ -102,6 +102,7 @@ class N4TsdColumns:
     speed: str = "speed_kmh"
     time: str = "time"                       # opcjonalnie: czas wiersza (ISO albo sekundy epoki) - do pary przejazdow w lambdzie
     concrete: str = "concrete"               # opcjonalnie: znacznik betonu (0/1) - do wykluczenia betonu w lambdzie
+    profile: str = "profile"                 # opcjonalnie: profil podluzny [mm] (np. profile1) - do wyrownania przejazdow
 
 
 @dataclass
@@ -177,6 +178,7 @@ class N4Geometry:
     require_valid_d0: bool = True                        # tylko pary z waznym d0 po obu stronach (okno >= min_rows wierszy)
     sections: N4Sections = field(default_factory=N4Sections)
     lambda_est: N4LambdaEst = field(default_factory=N4LambdaEst)
+    align: str = "auto"                                  # wyrownanie przejazdow profilem: auto (gdy jest kolumna profilu) | true | false
     window_m: float = 5.0                                # polowka okna wartosci TSD (W5)
     min_rows: int = 3
     date_override: str | None = None                     # data wspolna dla wszystkich przejazdow TSD (gdy brak jej w nazwie/pliku)
@@ -221,6 +223,7 @@ def build_n4_config(data: dict, base_dir=".") -> N4Config:
         for rule in g.antenna:
             if not isinstance(rule, dict) or not {"device", "d_m"} <= set(rule):
                 raise ConfigError("geometry.antenna: kazda regula to slownik z kluczami device, d_m [, era, confirmed, from, until]")
+        _choice(str(g.align).lower(), ("auto", "true", "false"), "geometry.align")
         if g.lambda_est.apply and not g.lambda_est.enabled:
             raise ConfigError("geometry.lambda_est.apply wymaga geometry.lambda_est.enabled: true")
         if g.sections.radius_m <= 0 or g.sections.min_matched_stations < 1:

@@ -157,3 +157,44 @@ def test_geometry_sections_detected_reported_and_used_as_filter(tmp_path):
     cfg_off = _cfg(tmp_path, paths, st_path, geometry={"sections": {"enabled": False}})
     res_off = run_n4(load_n4_config(cfg_off), dry_run=True)
     assert res_off["meta"]["geometry"]["n_pairs"] == 60 and "in_section" not in res_off["geo_pairs"]
+
+
+def test_geometry_mode_aligns_passes_with_profile(tmp_path):
+    """Dwa przejazdy tej samej drogi z identycznym GPS; profil drugiego przesuniety o 3 m: wyrownanie ustawia wspolny s_ref."""
+    from tsdfwd_tools.common.config_n4 import load_n4_config
+    from tsdfwd_tools.compare.pipeline import run_n4
+    n, shift = 5000, 3
+    rng = np.random.default_rng(11)
+    walk = np.cumsum(rng.normal(size=n + 60))
+    chain = np.arange(n, dtype=float)
+    lat = 50.0 + chain / 111200.0
+    paths = []
+    for name, off, noise in (("T4202507200001_rows.csv", 0, 0.1), ("T4202507200002_rows.csv", shift, 0.1)):
+        prof = walk[30 - off + np.arange(n)] + rng.normal(0, noise, n)               # profil drugiego przejazdu przesuniety o `shift` m
+        pd.DataFrame(dict(chainage_m=chain, lat=lat, lon=19.0, d0=100.0, gof=0.9, t12_c=20.0, profile=prof)).to_csv(tmp_path / name, index=False)
+        paths.append(tmp_path / name)
+    pos = np.arange(300.0, 4600.0, 200.0)
+    pd.DataFrame(dict(station_id=np.arange(len(pos)), session_id=1, station_m=(pos - 300.0) / 1000.0, latitude=50.0 + (pos + 1.0) / 111200.0,
+                      longitude=19.0, measured_at="2025-07-01T10:00:00", device="8082-119", date="2025-07-01", D0=200.0,
+                      t_mid_c=20.0)).to_csv(tmp_path / "st.csv", index=False)
+    cfg = {"tool": "tsd_fwd_compare", "mode": "geometry",
+           "geometry": {"tsd_rows": [str(p) for p in paths], "fwd_stations_csv": str(tmp_path / "st.csv"), "sections": {"enabled": False}},
+           "measures": {"n_boot": 20}, "uncertainty": {"replicates": 29}, "null_checks": {"n_boot": 20},
+           "output": {"dir": str(tmp_path / "out"), "overwrite": True}}
+    p = tmp_path / "c.yaml"
+    p.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    res = run_n4(load_n4_config(p), dry_run=True)
+    tp = res["geo_passes"].set_index("pass_id")
+    assert res["meta"]["geometry"]["align"]["enabled"] and res["meta"]["geometry"]["align"]["aligned"] == 2
+    assert set(tp["align_ref"]) == {"reference", "profile_ref"} and (tp["align_note"].isna()).all()
+    assert abs(tp["delta_med"].iloc[0] - tp["delta_med"].iloc[1]) == pytest.approx(shift, abs=0.25)
+    assert res["geo_align_blocks"]["used"].sum() >= 4 and "wyrownanie profilem" in res["meta"]["geometry"]["note"]
+    # bez kolumny profilu: tryb auto nie wyrownuje; geometry.align: true wymaga profilu
+    for pth in paths:
+        pd.read_csv(pth).drop(columns="profile").to_csv(pth, index=False)
+    res2 = run_n4(load_n4_config(p), dry_run=True)
+    assert not res2["meta"]["geometry"]["align"]["enabled"] and "align_ref" not in res2["geo_passes"]
+    cfg["geometry"]["align"] = "true"
+    p.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    with pytest.raises(ConfigError, match="profilu"):
+        run_n4(load_n4_config(p), dry_run=True)

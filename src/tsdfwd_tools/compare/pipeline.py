@@ -141,7 +141,7 @@ def run_n4(cfg: N4Config, dry_run: bool = False) -> dict:
     # --- przedzialy mnoznika przy malej liczbie klastrow ---
     mult_rows = []
     ok_main = valid_pairs(main_f, main_t)
-    if ok_main.sum() >= 3 and u.methods:
+    if ok_main.sum() >= 3 and len(np.unique(sess[ok_main])) >= 3 and u.methods:        # przedzialy klastrowe wymagaja >= 3 sesji FWD
         lr = np.log(main_f[ok_main]) - np.log(main_t[ok_main])
         mult_rows = multiplier_intervals(lr, sess[ok_main], u.replicates, u.seed_tag, seed_for, u.h0_multiplier,
                                          tuple(u.methods))

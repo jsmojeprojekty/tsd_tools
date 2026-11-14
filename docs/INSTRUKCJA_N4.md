@@ -33,7 +33,7 @@ arzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs
 ```
 **Wejscie**
 - Wiersze TSD (`geometry.tsd_rows`): CSV z kolumnami `chainage_m` (SUROWY pikietaz pliku, niemalejacy), `lat`, `lon`, `d0` (B_1510off, um),
-  `gof`, `t12_c` (temperatura warstwy z N2), opcjonalnie `speed_kmh`. Wygodnie: `*_rows.csv` z N3 (`output.rows_csv: true`). Nie podawaj
+  `gof`, `t12_c` (temperatura warstwy z N2), opcjonalnie `speed_kmh` oraz `profile` (profil podluzny [mm], np. `profile1` z eksportu pgc — patrz punkt 1a). Wygodnie: `*_rows.csv` z N3 (`output.rows_csv: true`). Nie podawaj
   `pos_m` ani pikietazu po przesunieciu — lag polozenia ugiec (-4,8 m) N4 stosuje sam, dokladnie raz.
 - Data przejazdu TSD: z `geometry.tsd_runs_csv` (`run_id`, `date`), z nazwy pliku (`T4RRRRMMDDnnnn`) albo z `geometry.date_override`.
   Brak daty to blad. Przedzial kalibracji TSD (`calib_interval`) wynika z daty i tabeli `geometry.calib_intervals`.
@@ -45,6 +45,12 @@ arzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs
 **Co N4 robi**
 1. Buduje os pasa (korytarz) z przejazdow TSD (albo bierze gotowa z `geometry.corridors_csv`) i przypisuje wiersze TSD: `s_ref` (pozycja
    wzdluz osi) i `lateral_m` (odleglosc poprzeczna, + = w lewo od kierunku jazdy).
+1a. **Wyrownanie profilem** (`geometry.align: auto`, domyslnie): gdy wiersze TSD maja profil podluzny, przejazdy przez ten sam korytarz sa
+   wyrownywane wzgledem siebie, bo GPS ma blad polozenia rzedu metrow. Sygnal to profil minus mediana biegnaca 101 m; najdluzszy przejazd jest odniesieniem,
+   pozostale przesuwa sie w blokach ~1 km (przesuniecie z korelacji, zakres ±15 m, blok uznany przy r >= 0,8, odstajace bloki > 3 m odrzucane), a
+   `s_ref = s_ref_gps + delta(s)`. Przejazdy bez wspolnej struktury profilu zostaja na GPS (`tsd_passes.csv`: `align_ref`, `align_note` =
+   no_profile / short / no_block_r08). Bez kolumny profilu (np. B_1510off) tryb `auto` nie wyrownuje; `true` wymaga profilu, `false` wylacza.
+   Wyniki wyrownania: kolumny `align_*`, `delta_*`, `centering_m` w `tsd_passes.csv` i `tsd_align_blocks.csv` (bloki: srodek, przesuniecie, r, uzyty).
 2. Rzutuje antene FWD na os, wyznacza kierunek sesji **z danych** (nie z pola kursu), przesuwa antene przed plyte wg tabeli regul aparatu
    (`geometry.antenna`; domyslnie 8002-367: 5,5 m do 2025-10-09, potem 0; 8082-119: 1,0 m; 8002-369: 1,0 m, niepotwierdzone) i wygladza polozenie
    regresja dystansomierza. Wynik: `s_fwd` i niepewnosc polozenia `sigma_long`.
@@ -80,7 +86,7 @@ arzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs
 **Czego ten tryb nie robi (jeszcze)**
 - Pary wynikaja z wspolnego korytarza i roku, nie z odcinkow; odcinki sa kontrola (kolumny `in_section`, opcjonalny filtr) i podstawa przegladu recznego.
   Odcinki liczone sa na surowym GPS (antena FWD i GPS wiersza TSD, bez przesuniecia plyty ani lagu), jak w zrodle.
-- `s_ref` pochodzi z GPS (bez wyrownania profilem, bez scalania duplikatow pasa). Os z przejazdow TSD zalezy od zestawu przejazdow — ta sama droga
+- Bez profilu `s_ref` pochodzi z samego GPS; nie ma tez scalania duplikatow pasa. Os z przejazdow TSD zalezy od zestawu przejazdow — ta sama droga
   z innym zestawem plikow moze dac troche inne `s_ref`; dla powtarzalnosci podaj gotowa os w `geometry.corridors_csv`.
 - Przejazdy z wieloma pasami jednej jezdni wymagaja czytelnych przejazdow w obu pasach (korytarze rozdzielane sa przy rozstawie > 1,75 m
   i kursie > 30 stopni).

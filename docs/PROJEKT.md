@@ -287,7 +287,7 @@ def fit_multiplier(...); def fit_affine(...); def leave_one_group_out(fit_fn, gr
 def estimate_lambda(tsd_repeat_pairs, fwd_repeat_pairs) -> LambdaResult                                                 # sigma_TSD, sigma_FWD, lambda
 def run_n4(cfg: N4Config) -> N4Result
 ```
-Tryb `pairs` obowiazkowy w E2; tryb `geometry` (przeniesienie `e1_sref` + `e2b1_geometry` + `e2b1_pairs`) wdrozony w E2b (moduly `compare\geo.py`, `fwd_position.py`, `pairing.py`, `geometry_pipeline.py`; `compare\sections.py` + `section_report.py` (odcinki Tab. 3.2 i raport przegladu) w E2c; `compare\lambda_est.py` (estymator lambdy, E2d); wyrownanie profilem i scalanie duplikatow pasa — jeszcze nie, patrz DZIENNIK).
+Tryb `pairs` obowiazkowy w E2; tryb `geometry` (przeniesienie `e1_sref` + `e2b1_geometry` + `e2b1_pairs`) wdrozony w E2b (moduly `compare\geo.py`, `fwd_position.py`, `pairing.py`, `geometry_pipeline.py`; `compare\sections.py` + `section_report.py` (odcinki Tab. 3.2 i raport przegladu) w E2c; `compare\lambda_est.py` (estymator lambdy, E2d), `compare\align.py` (wyrownanie profilem, E2e); scalanie duplikatow pasa — jeszcze nie, patrz DZIENNIK).
 
 ---------------------------------------------------------------------------------------------------
 
@@ -350,6 +350,7 @@ Legenda: tolerancja 0,01 w jednostce wielkosci, chyba ze podano inaczej. `@refer
 | T-N4-13 | Polozenie plyty FWD, 46826 stacji `odcinki` vs `fwd_plate_position_e2b` | `s_fwd`, `sigma_long`, `era`, `pos_source`, `direction`, `run_id` | 1e-6 (sigma_long 1e-4) | @reference (E2b) |
 | T-N4-14 | Kandydaci na pary i pary zerowe, korytarze 0..29 (prefiks `pair_id` 1..5632) vs `golden_pair_candidates`, `e2b1_null_map` | 5632 par; 16659 par zerowych; seed 20261017 | 1e-6 | @reference (E2b) |
 | T-N4-15 | Przypisanie wierszy TSD do korytarzy (`prepare_run` + `assign_run`) vs `tsd_sref` | korytarz > 99,95 %; `s_ref_gps` 0,02 m; `lateral_m` 0,003 m | jw. | @reference (E2b) |
+| T-N4-17 | Wyrownanie przejsc profilem (7 korytarzy, 100 przejsc) vs `tsd_passes`, `tsd_sref` | zrodlo wyrownania, liczba blokow, centrowanie, `s_ref` | `s_ref` 5 mm; centrowanie 1e-4 | @reference (E2e: 0 niezgodnych przejsc, max 1,1 mm) |
 | T-N4-16 | Mediana d0 w oknie W5 po `s_ref` vs `d0_tsd` Z15 | >= 99 % par zgodnych < 1e-6 (2888/2895 dla korytarzy 0..80) | 1e-6 | @reference (E2b; roznice = definicja okna S-N4-4) |
 
 ### 6.3 N3 (E3)
