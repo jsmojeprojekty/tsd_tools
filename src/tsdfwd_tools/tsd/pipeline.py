@@ -78,6 +78,10 @@ def load_layer_temperature(cfg: N3Config, run_name: str, chain: np.ndarray) -> t
 def process_run(cfg: N3Config, path: Path) -> dict:
     p = cfg.processing
     run: TsdRun = read_b1510off(path, cfg.input.expected_step_m)
+    if run.file_flags & int(TsdFlag.FILE_NOT_RECALIBRATED):
+        # pusty 'Re-calibrationfile' = eksport nominalny (z czujnikiem 1,51 m); jego d0 nie jest zrodlem ugiecia w N3 (decyzja Jacka)
+        raise ConfigError(f"{path.name}: eksport nominalny (pusty 'Re-calibrationfile'); N3 przyjmuje wylacznie eksport B_1510off "
+                          "(d0 przeliczone z 9 czujnikow nachylen, bez czujnika 1,51 m)")
     d = run.data.copy().reset_index(drop=True)
     n = len(d)
     chain = d["chainage_m"].to_numpy(float)

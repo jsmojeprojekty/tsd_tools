@@ -420,3 +420,15 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 |---|---|---|---|
 | 47 numerow testow (T-N1-01..09, T-N2-01..10, T-N3-01..10, T-N4-01..18) wszystkie z co najmniej jednym przypadkiem | 264 przypadki: 262 zaliczone, 2 oczekiwane niepowodzenia (xfail), 0 niezaliczonych, 0 pominietych (dane referencyjne dostepne, tylko odczyt) | 2 xfail = T-N4-05 (znana rozbieznosc Q-N4-1, przed decyzja) | OK |
 | Testy bez numeru T (konfiguracja, CLI, przypadki brzegowe) | 40 przypadkow, wszystkie zaliczone, wylistowane w p. 6 zalacznika | — | OK |
+
+## 2026-11-14 — N3: wejscie .xls/.xlsx i odmowa dla eksportu nominalnego
+
+- Jacek dostarczyl pierwszy plik z sieci (`dane_siec/T4202608130006.raw.sup.xls`, poza repozytorium; `dane_siec/` w .gitignore). Uklad jak `raw.sup.txt`: 905 wierszy co 1 m, 80 kolumn (10 kanalow nachylen z 1,51 m, D-450..D1500 bez D1800, GoF, GPS), `Re-calibrationfile` pusty. Decyzja Jacka: to eksport nominalny; N3 przyjmuje wylacznie B_1510off.
+- Zmiany: czytnik N3 czyta takze `.xls`/`.xlsx` (ten sam uklad; `xlrd`/`openpyxl`, bez zmiany reszty logiki); pusty `Re-calibrationfile` konczy przetwarzanie bledem (wczesniej tylko flaga `FILE_NOT_RECALIBRATED`, a plik nominalny dawal wyniki i XML). Brak nowych parametrow ani metod. Instrukcja N3 zaktualizowana.
+- Plik z sieci nie daje wiec XML do czasu dostarczenia eksportu B_1510off (przeliczenie wykonuje sie poza narzedziami).
+
+| Wzorzec | Uzyskano | Roznica | Status |
+|---|---|---|---|
+| Ten sam syntetyczny eksport jako TXT i XLSX: identyczne dane, flagi, okna 10 m i XML | zgodne bajt w bajt (testy `test_read_xlsx_sheet_same_as_txt`, `test_cli_n3_reads_xlsx_sheet_like_txt`) | 0 | OK |
+| Plik z sieci: data 2026-08-13, 905 wierszy, 885 waznych D0, flaga nominalnego eksportu | zgodne; N3 odmawia z komunikatem o eksporcie nominalnym | — | OK |
+| Testy N3 (jednostkowe + regresja) | 30 zaliczonych (27 jednostkowych N3 + 3 regresyjne) | — | OK |

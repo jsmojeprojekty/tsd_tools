@@ -7,8 +7,10 @@ Z eksportu przejazdu TSD (B_1510off) liczy ugiecie D0 skorygowane do 20 C, calki
 w oknach +-5 m co 10 m (i w odcinkach 50 / 100 m) i zapisuje wyniki jako CSV oraz plik XML DSN `UC` (zalacznik H p. 4.2).
 
 ## 2. Co trzeba miec
-- Eksport TSD **B_1510off**: `*.raw.sup.txt` (D0 przeliczone z 9 czujnikow nachylen, **bez czujnika 1,51 m**). Eksport nominalny
-  (z czujnikiem 1,51 m) nie jest tu uzywany jako zrodlo D0.
+- Eksport TSD **B_1510off**: `*.raw.sup.txt` albo arkusz `*.raw.sup.xls` / `.xlsx` o tym samym ukladzie (blok parametrow, wiersz `Data`,
+  naglowek kolumn, dane co 1 m); D0 przeliczone z 9 czujnikow nachylen, **bez czujnika 1,51 m**.
+- **Eksport nominalny** (z czujnikiem 1,51 m) nie jest zrodlem D0: rozpoznaje sie go po **pustym polu `Re-calibrationfile`**; N3 odmawia
+  wtedy przetworzenia pliku (blad z nazwa pliku, bez wynikow i bez XML). Nominalny plik trzeba najpierw przeliczyc do B_1510off.
 - **Temperatura warstwy 12 cm** na przejezdzie: CSV z kolumnami `chainage_m` i `t12_c` (i opcjonalnie `file`) — najlepiej wynik N2
   z `input.passthrough: [chainage_m, file]`. Temperatura pirometru TSD (`Temp Road`) **nie jest** temperatura warstwy; bez temperatury
   warstwy trzeba swiadomie ustawic `layer_temp.source: none` + `allow_uncorrected: true` (D0 bez korekty, flaga `T_MISSING`).

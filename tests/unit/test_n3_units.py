@@ -156,6 +156,58 @@ def test_read_synthetic_b1510off(make_tsd):
     assert d["slope_0110"].iloc[0] == pytest.approx(2000 * 0.11) and d["gps_time_s"].iloc[0] == pytest.approx(10 * 3600 + 16 * 60 + 40)
 
 
+def _txt_to_sheet(txt_path, xlsx_path, name_with_colon=True):
+    """Przepisuje syntetyczny raw.sup.txt do arkusza o ukladzie eksportu XLS z TSD (klucz z dwukropkiem, wartosc w kolejnej komorce)."""
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    in_data = False
+    for ln in txt_path.read_text(encoding="utf-8").splitlines():
+        if ln == "Data:":
+            ws.append(["Data"])
+            in_data = True
+        elif in_data:
+            cells = ln.split(", ")
+            header_row = ws.cell(ws.max_row, 1).value == "Data"                  # wiersz tuz po 'Data' to naglowek kolumn
+            ws.append(cells if header_row else [float(c) if c else None for c in cells])
+        elif ln in ("Headers:", "Parameters:"):
+            ws.append([ln[:-1]])
+        elif ":" in ln:
+            k, _, v = ln.partition(":")
+            ws.append([k + (":" if name_with_colon else ""), None, v.strip() or None])
+        else:
+            ws.append([])
+    wb.save(xlsx_path)
+
+
+def test_read_xlsx_sheet_same_as_txt(make_tsd, tmp_path):
+    txt = make_tsd(n=40)
+    xlsx = tmp_path / "T4202504230012.raw.sup.xlsx"
+    _txt_to_sheet(txt, xlsx)
+    a, b = read_b1510off(txt), read_b1510off(xlsx)
+    pd.testing.assert_frame_equal(a.data, b.data, check_dtype=False, rtol=1e-9)
+    assert a.file_flags == b.file_flags == 0 and a.date == b.date and a.meta["Re-calibrationfile"] == b.meta["Re-calibrationfile"]
+
+
+def test_read_xlsx_empty_recalibration_means_nominal_export(make_tsd, tmp_path):
+    txt = make_tsd(n=30, recal="")
+    xlsx = tmp_path / "T4202504230012.raw.sup.xlsx"
+    _txt_to_sheet(txt, xlsx)
+    run = read_b1510off(xlsx)
+    assert run.meta["Re-calibrationfile"] == "" and run.file_flags & int(TsdFlag.FILE_NOT_RECALIBRATED)
+
+
+def test_read_xlsx_without_data_row_is_an_error(tmp_path):
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    wb.active.append(["cos", 1])
+    wb.save(tmp_path / "x.raw.sup.xlsx")
+    with pytest.raises(ValueError, match="Data"):
+        read_b1510off(tmp_path / "x.raw.sup.xlsx")
+
+
 def test_read_flags_and_errors(make_tsd, tmp_path):
     f = read_b1510off(make_tsd(name="T4202008060001.raw.sup.txt", n=30, recal=""))
     assert f.file_flags & TsdFlag.FILE_NOT_RECALIBRATED and f.file_flags & TsdFlag.FILE_YEAR_OUT_OF_RANGE
@@ -278,6 +330,28 @@ def _cfg(tmp_path, tsd, **over):
     p = tmp_path / "n3.yaml"
     p.write_text(yaml.safe_dump(cfg), encoding="utf-8")
     return p
+
+
+def test_cli_n3_refuses_nominal_export_and_writes_no_xml(tmp_path, make_tsd, capsys):
+    tsd = make_tsd(n=60, recal="")                                   # pusty Re-calibrationfile = eksport nominalny
+    cfg = _cfg(tmp_path, tsd)
+    assert main(["tsd_network", "--config", str(cfg)]) != 0
+    assert "nominalny" in capsys.readouterr().err
+    assert not list((tmp_path / "out").glob("UC_*.xml")) if (tmp_path / "out").exists() else True
+
+
+def test_cli_n3_reads_xlsx_sheet_like_txt(tmp_path, make_tsd):
+    txt = make_tsd(n=60)
+    xlsx = tmp_path / "T4202504230012.raw.sup.xlsx"
+    _txt_to_sheet(txt, xlsx)
+    out_txt, out_xls = tmp_path / "a", tmp_path / "b"
+    for src, out in ((txt, out_txt), (xlsx, out_xls)):
+        cfg = _cfg(tmp_path, src, output={"dir": str(out), "rows_csv": True, "overwrite": True})
+        assert main(["tsd_network", "--config", str(cfg)]) == 0
+    a = pd.read_csv(out_txt / "T4202504230012_windows_10m.csv")
+    b = pd.read_csv(out_xls / "T4202504230012_windows_10m.csv")
+    pd.testing.assert_frame_equal(a, b)
+    assert (out_xls / "UC_T4202504230012.xml").read_bytes() == (out_txt / "UC_T4202504230012.xml").read_bytes()
 
 
 def test_cli_n3_analytic_values_and_xml(tmp_path, make_tsd):
