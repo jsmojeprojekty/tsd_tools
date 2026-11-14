@@ -372,3 +372,29 @@ Test T-N2-01 to powtarzalnosc na zbiorze eksploracyjnym H, nie deklaracja doklad
 
 **STOP — decyzja:** brak decyzji blokujacych.
 
+## 2026-11-14 — E2f: N4 scalanie duplikatow pasa i odtworzenie calej osi referencyjnej
+
+**Co zrobiono**
+- `compare\geo.py`: `parallel_close`, `find_merges`, `apply_merges` (korytarz krotszy niz 2 km, ktory na >= 50 % dlugosci lezy <= 2,5 m od dluzszego, nierozwiazanego korytarza tego samego kierunku, zostaje rozwiazany do tego o najwiekszym udziale; punkty -> cel jako `wide` <= 4,25 m i kurs <= 30 st., dalsze `merged_far`). Port z `e1_sref` (wpis 37, decyzja p. 2). Progi w `AxisParams` (`merge_max_len_m`, `merge_min_share`, `parallel_close_m`); `build_axis(..., merge=True)`.
+- Integracja z trybem `geometry`: `geometry.merge_lanes` (domyslnie true, tylko dla osi z przejazdow). Pary i okna wartosci korzystaja wylacznie z wierszy pasa wlasnego (`lane_fit = lane`), jak w zrodle; punkty `wide` zostaja w przejsciach (wyrownanie, `wide_share`, lambda). Nowe wyjscie: `corridor_merges.csv`, kolumna `wide_share` w `tsd_passes.csv`.
+
+**Co sprawdzono (262 testy zielone + 2 `xfail`; nowe: 5 + 1 syntetycznych, 1 regresji)**
+| Wartosc referencyjna | Uzyskana | Roznica | Status |
+|---|---|---|---|
+| T-N4-18 os zbudowana od zera z 239 plikow TSD (bez pliku 55 `qc_gps_shifted`): liczba i numery korytarzy | 165 = 165, te same numery | 0 | OK |
+| T-N4-18 dlugosci korytarzy vs `ref_corridors` | max roznica 0 | tol. 1e-3 | OK |
+| T-N4-18 scalenia duplikatow pasa vs `ref_corridor_merges`: zestaw, cel, punkty `wide` i `merged_far` | 43 = 43, 100 % zgodne | 0 | OK |
+| T-N4-18 wiersze vs `tsd_sref`: korytarz | 6 956 291 z 6 956 291 zgodnych | 0 | OK |
+| T-N4-18 `s_ref_gps` | max roznica 0,0005 m (zapis w bazie z dokladnoscia 1 mm) | tol. 1e-3 | OK |
+| T-N4-18 punkty `wide` (`lane_fit = wide`) | 25 219 = 25 219, wszystkie te same | 0 | OK |
+| syntetyczne: duplikat 2,2 m obok jest scalany; 4 m, > 2 km i przeciwny kierunek nie sa; `parallel_close`; potok: pary tylko z pasa wlasnego, bez scalania dwa korytarze | zgodne | wg zalozen | OK |
+
+**Uwagi**
+- Cala os referencyjna (165 korytarzy, 7 mln wierszy) jest odtwarzana od zera w ok. 40 s; razem z E2b i E2e potwierdza to, ze potok osi, przypisania, wyrownania i scalania zgadza sie ze zrodlem na calym zbiorze, nie tylko na probkach.
+- Baza referencyjna nie ma stref zlego GPS (`tsd_gps_bad_segments` puste), wiec brak drogomierza zakotwiczonego nie rozni wynikow na tym zbiorze; dla danych z blednym GPS wiersze trzeba usunac z wejscia albo pominac.
+- Scalanie zalezy od zbioru przejazdow (korytarze budowane zachlannie od najdluzszych ciagow): ten sam zbior daje te same korytarze, inny zbior moze dac inne numery i scalenia.
+
+**Co zostaje:** drogomierz zakotwiczony w strefach zlego GPS (`apply_odometer_anchor`; wymaga tabeli stref zlego GPS); do ustalenia: `UC_Schema.xsd`, Q-N3-14, Q-N3-15, Q-N3-16, potwierdzenie `SCI_SUB`.
+
+**STOP — decyzja:** brak decyzji blokujacych.
+

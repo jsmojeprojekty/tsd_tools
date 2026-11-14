@@ -198,3 +198,42 @@ def test_geometry_mode_aligns_passes_with_profile(tmp_path):
     p.write_text(yaml.safe_dump(cfg), encoding="utf-8")
     with pytest.raises(ConfigError, match="profilu"):
         run_n4(load_n4_config(p), dry_run=True)
+
+
+def test_geometry_mode_merges_duplicate_lane_and_uses_only_own_lane_rows(tmp_path):
+    from tsdfwd_tools.common.config_n4 import load_n4_config
+    from tsdfwd_tools.compare.pipeline import run_n4
+    n = 3000
+    chain = np.arange(n, dtype=float)
+    lat = 50.0 + chain / 111200.0
+    pd.DataFrame(dict(chainage_m=chain, lat=lat, lon=19.0, d0=100.0, gof=0.9, t12_c=20.0)).to_csv(tmp_path / "T4202507200001_rows.csv", index=False)
+    c2 = np.arange(1000.0, 1600.0)                                              # krotki duplikat pasa 2,2 m obok (na wschod)
+    pd.DataFrame(dict(chainage_m=c2, lat=50.0 + c2 / 111200.0, lon=19.0 + 2.2 / (111200.0 * np.cos(np.radians(50.0))), d0=110.0, gof=0.9,
+                      t12_c=20.0)).to_csv(tmp_path / "T4202507200002_rows.csv", index=False)
+    rng = np.random.default_rng(1)
+    recs, sid = [], 0
+    for k in range(3):
+        for i, pos in enumerate((400.0, 800.0, 1200.0, 1400.0, 2000.0, 2400.0)):
+            sid += 1
+            recs.append(dict(station_id=sid, session_id=k + 1, station_m=(pos - 400.0) / 1000.0, latitude=50.0 + (pos + 1.0) / 111200.0, longitude=19.0,
+                             measured_at=f"2025-07-01T10:{i:02d}:00", device="8082-119", date="2025-07-01",
+                             D0=200.0 * (1 + rng.normal(0, 0.03)), t_mid_c=20.0))
+    pd.DataFrame(recs).to_csv(tmp_path / "st.csv", index=False)
+    cfg = {"tool": "tsd_fwd_compare", "mode": "geometry",
+           "geometry": {"tsd_rows": [str(tmp_path / "T4202507200001_rows.csv"), str(tmp_path / "T4202507200002_rows.csv")],
+                        "fwd_stations_csv": str(tmp_path / "st.csv"), "sections": {"enabled": False}},
+           "measures": {"n_boot": 20}, "uncertainty": {"replicates": 29}, "null_checks": {"n_boot": 20},
+           "output": {"dir": str(tmp_path / "out"), "overwrite": True}}
+    p = tmp_path / "c.yaml"
+    p.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    res = run_n4(load_n4_config(p), dry_run=False)
+    mg = res["geo_merges"]
+    assert len(mg) == 1 and res["meta"]["geometry"]["axis"]["n_dissolved"] == 1 and res["meta"]["geometry"]["axis"]["merged_lanes"]
+    ps = res["geo_passes"].set_index("file_id")
+    assert ps.loc["T4202507200002", "wide_share"] > 0.7 and ps.loc["T4202507200001", "wide_share"] == 0.0
+    assert set(res["geo_pairs"]["file_id"]) == {"T4202507200001"}                  # pary tylko z wierszami pasa wlasnego
+    assert (tmp_path / "out" / "corridor_merges.csv").is_file()
+    cfg["geometry"]["merge_lanes"] = False
+    p.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    res2 = run_n4(load_n4_config(p), dry_run=True)
+    assert res2["geo_merges"] is None and len(res2["geo_corridors"]) == 2 and len(res["geo_corridors"]) == 1       # bez scalania: dwa korytarze

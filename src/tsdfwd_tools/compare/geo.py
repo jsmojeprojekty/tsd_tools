@@ -4,8 +4,8 @@ zrodlo: C:\\projects\\sql_tsd_fwd\\bak\\e1_sref.py (to_2180, convergence_deg, sh
 Corridor, project_on, best_projection, try_extend, build_corridors, refine_geometry, classify_unassigned, assign_task,
 gather_by_corridor, pass_groups) oraz bak\\e0b_t20_defl.py (heading_of, angdiff, corrected_xy), stan d89080a / 2026-10-18.
 Przerobione: bez multiprocessing, bez zapisu do baz i bez globalnego loggera; progi w dataclass `AxisParams`.
-Pominiete swiadomie (patrz DZIENNIK E2b): wyrownanie profilem (wymaga kanalu profile1, ktorego nie ma eksport B_1510off),
-scalanie duplikatow pasa (find_merges/apply_merges) i drogomierz zakotwiczony w strefach zlego GPS.
+Scalanie duplikatow pasa (parallel_close, find_merges, apply_merges; wpis 37 decyzja p. 2) jest w tym module; wyrownanie profilem w
+`align.py`. Pominiety swiadomie: drogomierz zakotwiczony w strefach zlego GPS (tsd_gps_bad_segments).
 
 Konwencje: polozenia w EPSG:2180 jako (x = E, y = N); kurs = azymut siatki [stopnie, 0 = polnoc, zgodnie z zegarem];
 `lateral_m` ze znakiem: + = w lewo od kierunku korytarza; s = dlugosc luku wzdluz osi korytarza [m]."""
@@ -47,6 +47,14 @@ class AxisParams:
     fwd_adj_m: float = 5.0           # pas sasiedni dla stacji FWD
     pass_gap_rows: int = 50          # przerwa dzielaca przejscia
     pass_back_m: float = 5.0         # cofniecie s dzielace przejscia
+    merge_max_len_m: float = 2000.0  # scalanie duplikatow pasa: rozwiazywane sa tylko korytarze krotsze
+    merge_min_share: float = 0.5     # udzial dlugosci <= parallel_close_m od dluzszego korytarza tego samego kierunku
+    parallel_close_m: float = 2.5    # rozstaw osi uznawany za duplikat pasa (zgodny kurs)
+
+    @property
+    def merge_wide_m(self) -> float:
+        """Maks. odleglosc punktu rozwiazanego korytarza od osi celu (lane_half + parallel_close)."""
+        return self.lane_half_m + self.parallel_close_m
 
 
 DEFAULT_AXIS = AxisParams()
@@ -514,6 +522,76 @@ def pass_groups(cid, s, p: AxisParams = DEFAULT_AXIS):
 
 
 # ---------------------------------------------------------------------------
+# Scalanie duplikatow pasa
+# ---------------------------------------------------------------------------
+
+def parallel_close(corrs, p: AxisParams = DEFAULT_AXIS):
+    """Udzial punktow korytarza <= parallel_close_m od innego korytarza o zgodnym kursie (podejrzenie duplikatu pasa)."""
+    out = {}
+    for c in corrs:
+        close = np.zeros(len(c.x), dtype=bool)
+        for o in corrs:
+            if o.cid != c.cid and o.near(c.bbox, p.parallel_close_m + 1):
+                close |= project_on(o, c.x, c.y, c.hd, p.parallel_close_m, heading=True, p=p)[3]
+        out[c.cid] = float(close.mean())
+    return out
+
+
+def find_merges(corrs, p: AxisParams = DEFAULT_AXIS):
+    """Regula scalania duplikatow pasa: korytarz krotszy niz merge_max_len_m, ktory na >= merge_min_share dlugosci lezy <= parallel_close_m od
+    dluzszego, nierozwiazanego korytarza tego samego kierunku (kurs <= head_tol_deg), zostaje rozwiazany do korytarza o najwiekszym udziale
+    bliskosci. Kandydaci przegladani od najdluzszego, wiec status dluzszych jest juz ostateczny, a lancuchy duplikatow trafiaja do korytarza
+    glownego. Zwraca liste slownikow (dissolved_id, target_id, length_m, close_share, sep_med_m)."""
+    by_len = sorted(corrs, key=lambda c: (-c.length, c.cid))
+    dissolved, out = set(), []
+    for c in by_len:
+        if c.length >= p.merge_max_len_m:
+            continue
+        best = None
+        for o in by_len:
+            if o.length <= c.length:
+                break
+            if o.cid in dissolved or not o.near(c.bbox, p.parallel_close_m + 1):
+                continue
+            _, lat, _, ok = project_on(o, c.x, c.y, c.hd, p.parallel_close_m, heading=True, p=p)
+            share = float(ok.mean())
+            if share >= p.merge_min_share and (best is None or share > best[1]):
+                best = (o.cid, share, float(np.median(np.abs(lat[ok]))))
+        if best is not None:
+            dissolved.add(c.cid)
+            out.append(dict(dissolved_id=c.cid, target_id=best[0], length_m=float(c.length), close_share=best[1], sep_med_m=best[2]))
+    return out
+
+
+def apply_merges(runs: dict, corrs, assigned: dict, merges, p: AxisParams = DEFAULT_AXIS):
+    """Punkty rozwiazanych korytarzy -> korytarz docelowy (rzut na jego geometrie, <= merge_wide_m, kurs <= head_tol_deg), znacznik `wide`;
+    punkty, ktorych nie da sie rzutowac, zostaja nieprzypisane z przyczyna 'merged_far'. assigned: {run_id: (cid, s, lateral, reason)};
+    zwraca (assigned zmienione w miejscu, wide {run_id: maska bool}, liczba przeniesionych per korytarz, liczba merged_far per korytarz)."""
+    by_id = {c.cid: c for c in corrs}
+    tgt = {m["dissolved_id"]: m["target_id"] for m in merges}
+    moved, far = {}, {}
+    code_far = REASONS.index("merged_far")
+    wide = {}
+    for rid, d in runs.items():
+        cid, s, lat, rc = assigned[rid]
+        w = np.zeros(len(cid), dtype=bool)
+        for k in np.unique(cid[cid >= 0]):
+            k = int(k)
+            if k not in tgt:
+                continue
+            idx = np.nonzero(cid == k)[0]
+            t = by_id[tgt[k]]
+            s2, lat2, _, ok = project_on(t, d["xc"][idx], d["yc"][idx], d["hd"][idx], p.merge_wide_m, heading=True, p=p)
+            i_ok, i_far = idx[ok], idx[~ok]
+            cid[i_ok], s[i_ok], lat[i_ok], w[i_ok] = t.cid, s2[ok], lat2[ok], True
+            cid[i_far], s[i_far], lat[i_far], rc[i_far] = -1, np.nan, np.nan, code_far
+            moved[k] = moved.get(k, 0) + len(i_ok)
+            far[k] = far.get(k, 0) + len(i_far)
+        wide[rid] = w
+    return assigned, wide, moved, far
+
+
+# ---------------------------------------------------------------------------
 # Przejazd TSD -> ciagi
 # ---------------------------------------------------------------------------
 
@@ -539,9 +617,10 @@ def prepare_run(chainage_m, lat, lon, lag_m: float = TSD_OFFSET_M, p: AxisParams
     return dict(s=s, xc=xc, yc=yc, hd=hd, seg_id=seg_id, segs=segs)
 
 
-def build_axis(runs: dict, p: AxisParams = DEFAULT_AXIS):
-    """Os referencyjna z przejazdow (GPS, bez wyrownania profilem): budowa korytarzy, jedna iteracja wygladzenia osi i ponowne
-    rzutowanie wszystkich przejazdow. Zwraca (korytarze, przypisania {run_id: (cid, s_ref_gps, lateral, reason)}, info)."""
+def build_axis(runs: dict, p: AxisParams = DEFAULT_AXIS, merge: bool = False):
+    """Os referencyjna z przejazdow (GPS): budowa korytarzy, jedna iteracja wygladzenia osi i ponowne rzutowanie wszystkich przejazdow;
+    przy merge=True dodatkowo scalanie duplikatow pasa (rozwiazane korytarze znikaja z listy, ich punkty trafiaja do celu jako `wide`).
+    Zwraca (korytarze zywe, przypisania {run_id: (cid, s_ref_gps, lateral, reason)}, info); info['wide'] = {run_id: maska}, info['merges'] = lista."""
     corrs, info = build_corridors(runs, p)
     assigned0 = {fid: assign_run(corrs, d, False, p) for fid, d in runs.items()}
     grp = gather_by_corridor(assigned0, len(corrs))
@@ -551,4 +630,14 @@ def build_axis(runs: dict, p: AxisParams = DEFAULT_AXIS):
         c.set_geom(x2, y2)
     assigned = {fid: assign_run(corrs, d, True, p) for fid, d in runs.items()}
     info["n_corridors"] = len(corrs)
+    info["wide"] = {rid: np.zeros(len(a[0]), dtype=bool) for rid, a in assigned.items()}
+    info["merges"] = []
+    if merge:
+        merges = find_merges(corrs, p)
+        assigned, wide, moved, far = apply_merges(runs, corrs, assigned, merges, p)
+        dissolved = {m["dissolved_id"] for m in merges}
+        for m in merges:
+            m.update(n_points_wide=moved.get(m["dissolved_id"], 0), n_points_far=far.get(m["dissolved_id"], 0))
+        corrs = [c for c in corrs if c.cid not in dissolved]
+        info.update(wide=wide, merges=merges, n_corridors=len(corrs), n_dissolved=len(dissolved))
     return corrs, assigned, info

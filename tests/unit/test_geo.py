@@ -171,3 +171,42 @@ def test_prepare_run_and_build_axis_end_to_end():
     assert ok.sum() > 1400 and np.nanmax(np.abs(lat_m[ok])) < 0.05
     # lag -4,8 m: polozenie wiersza ma byc GPS z przodu, wiec s_ref_gps rosnie wzdluz toru
     assert np.all(np.diff(s[ok]) > 0)
+
+
+def _merge_runs(second_offset=2.2, second_len=600.0, second_reverse=False, seed=2):
+    """Pas glowny (4 km) i krotki "duplikat" obok; maly szum drugiego przejazdu, by caly odcinek lezal poza pasem 1,75 m glownego."""
+    rng = np.random.default_rng(seed)
+    runs = {1: _mk_run(np.arange(0.0, 4000.0), -1.75, rng),
+            2: _mk_run(np.arange(1000.0, 1000.0 + second_len), -1.75 + second_offset, rng, noise=0.03)}
+    if second_reverse:
+        runs[2] = _mk_run(np.arange(1000.0 + second_len, 1000.0, -1.0), -1.75 + second_offset, rng, noise=0.03)
+    return runs
+
+
+def test_short_parallel_lane_is_merged_and_points_become_wide():
+    runs = _merge_runs()
+    corrs, assigned, info = G.build_axis(runs, merge=True)
+    assert len(info["merges"]) == 1 and info["n_dissolved"] == 1 and len(corrs) == 1
+    m = info["merges"][0]
+    assert m["close_share"] >= 0.5 and m["length_m"] < 700 and abs(m["sep_med_m"] - 2.2) < 0.3 and m["n_points_wide"] > 450
+    cid, s, lat, rc = assigned[2]
+    w = info["wide"][2]
+    assert w.sum() == m["n_points_wide"] and (cid[w] == corrs[0].cid).all() and abs(np.median(lat[w]) - 2.2) < 0.3
+    assert not info["wide"][1].any()
+    # bez scalania: dwa korytarze, brak punktow wide
+    corrs0, _, info0 = G.build_axis(runs, merge=False)
+    assert len(corrs0) == 2 and info0["merges"] == [] and not info0["wide"][2].any()
+
+
+@pytest.mark.parametrize("kw", [dict(second_offset=4.0), dict(second_len=2400.0), dict(second_reverse=True)])
+def test_merge_rules_do_not_merge_far_long_or_opposite_lanes(kw):
+    corrs, assigned, info = G.build_axis(_merge_runs(**kw), merge=True)
+    assert info["merges"] == [] and len(corrs) == 2
+
+
+def test_parallel_close_share():
+    runs = _merge_runs()
+    corrs, _, _ = G.build_axis(runs, merge=False)
+    pc = G.parallel_close(corrs)
+    short = min(corrs, key=lambda c: c.length)
+    assert pc[short.cid] > 0.7 and pc[max(corrs, key=lambda c: c.length).cid] < 0.2

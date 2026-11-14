@@ -45,6 +45,12 @@ arzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs
 **Co N4 robi**
 1. Buduje os pasa (korytarz) z przejazdow TSD (albo bierze gotowa z `geometry.corridors_csv`) i przypisuje wiersze TSD: `s_ref` (pozycja
    wzdluz osi) i `lateral_m` (odleglosc poprzeczna, + = w lewo od kierunku jazdy).
+1b. **Scalanie duplikatow pasa** (`geometry.merge_lanes: true`, domyslnie; tylko gdy os powstaje z przejazdow TSD): krotki korytarz (< 2 km), ktory na
+   co najmniej polowie dlugosci lezy <= 2,5 m od dluzszego korytarza o tym samym kierunku, jest traktowany jako ten sam pas (np. przejazd obok
+   z odchylka GPS) i rozwiazywany do dluzszego. Jego punkty (<= 4,25 m od celu) wchodza do celu jako `wide`: biora udzial w wyrownaniu profilem i
+   statystykach, ale **nie tworza par** (do par trafiaja tylko wiersze pasa wlasnego, <= 1,75 m od osi). Punkty dalej niz 4,25 m zostaja
+   nieprzypisane. Lista scalen: `corridor_merges.csv`; udzial punktow `wide` w przejsciu: `tsd_passes.csv` (`wide_share`). Przy gotowej osi
+   (`corridors_csv`) scalania nie ma.
 1a. **Wyrownanie profilem** (`geometry.align: auto`, domyslnie): gdy wiersze TSD maja profil podluzny, przejazdy przez ten sam korytarz sa
    wyrownywane wzgledem siebie, bo GPS ma blad polozenia rzedu metrow. Sygnal to profil minus mediana biegnaca 101 m; najdluzszy przejazd jest odniesieniem,
    pozostale przesuwa sie w blokach ~1 km (przesuniecie z korelacji, zakres ±15 m, blok uznany przy r >= 0,8, odstajace bloki > 3 m odrzucane), a
@@ -86,7 +92,7 @@ arzedzia_tsd_fwd\python.exe -m tsdfwd_tools tsd_fwd_compare --config configs
 **Czego ten tryb nie robi (jeszcze)**
 - Pary wynikaja z wspolnego korytarza i roku, nie z odcinkow; odcinki sa kontrola (kolumny `in_section`, opcjonalny filtr) i podstawa przegladu recznego.
   Odcinki liczone sa na surowym GPS (antena FWD i GPS wiersza TSD, bez przesuniecia plyty ani lagu), jak w zrodle.
-- Bez profilu `s_ref` pochodzi z samego GPS; nie ma tez scalania duplikatow pasa. Os z przejazdow TSD zalezy od zestawu przejazdow — ta sama droga
+- Bez profilu `s_ref` pochodzi z samego GPS. Nie ma drogomierza zakotwiczonego w strefach zlego GPS (wiersze z blednym GPS trzeba usunac z wejscia). Os z przejazdow TSD zalezy od zestawu przejazdow — ta sama droga
   z innym zestawem plikow moze dac troche inne `s_ref`; dla powtarzalnosci podaj gotowa os w `geometry.corridors_csv`.
 - Przejazdy z wieloma pasami jednej jezdni wymagaja czytelnych przejazdow w obu pasach (korytarze rozdzielane sa przy rozstawie > 1,75 m
   i kursie > 30 stopni).

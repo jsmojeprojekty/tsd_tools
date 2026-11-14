@@ -244,9 +244,13 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
         files["corridors_csv"] = str(cp)
         assigned = {rid: G.assign_run(corridors, r, True, ax) for rid, r in runs.items()}
         axis_info = dict(source="file", n_corridors=len(corridors))
+        wide = {rid: np.zeros(len(a[0]), dtype=bool) for rid, a in assigned.items()}
+        merges = []
     else:
-        corridors, assigned, axis_info = G.build_axis(runs, ax)
+        corridors, assigned, axis_info = G.build_axis(runs, ax, merge=g.merge_lanes)
         axis_info["source"] = "tsd_runs"
+        wide, merges = axis_info.pop("wide"), axis_info.pop("merges")
+    axis_info["merged_lanes"] = bool(g.merge_lanes and not g.corridors_csv)
     log.info("os: %d korytarzy (%s), przejazdow TSD: %d, stacji FWD: %d", len(corridors), axis_info["source"], len(runs), len(stations))
 
     # przejscia (plik x korytarz), ewentualne wyrownanie profilem, wiersze przejsc posortowane po s_ref
@@ -256,7 +260,7 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
         for cc, idx in G.pass_groups(cid, s, ax):
             idx = idx[np.isfinite(s[idx])]
             if len(idx):
-                raw.append(dict(pass_id=len(raw) + 1, run=rid, corridor=int(cc), idx=idx, s=s[idx]))
+                raw.append(dict(pass_id=len(raw) + 1, run=rid, corridor=int(cc), idx=idx, s=s[idx], wide=wide[rid][idx]))
     have_profile = any(np.isfinite(d["profile"].to_numpy()).any() for d in runs_df.values())
     mode_align = str(g.align).lower()
     if mode_align == "true" and not have_profile:
@@ -281,25 +285,30 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
                           sources={k: int(v) for k, v in pd.Series([x for r in raw for x in set(r["src"])]).value_counts().items()})
     else:
         align_info = dict(enabled=False, reason="brak kolumny profilu" if not have_profile else "geometry.align: false")
-    passes, pass_rows = [], {}
+    passes, pass_rows, pass_rows_all = [], {}, {}
     for r in raw:
         pid, rid, d = r["pass_id"], r["run"], runs_df[r["run"]]
         cid, s, lat, _ = assigned[rid]
         s_ref = r["s_ref"] if do_align else r["s"]
         order = np.argsort(s_ref, kind="stable")
         ix = r["idx"][order]
-        pass_rows[pid] = dict(s=s_ref[order], tsd_id=ix.astype(np.int64), lat=lat[ix], gof=d["gof"].to_numpy()[ix],
-                              d0=d["d0"].to_numpy()[ix], t12=d["t12"].to_numpy()[ix])
+        row = dict(s=s_ref[order], tsd_id=ix.astype(np.int64), lat=lat[ix], gof=d["gof"].to_numpy()[ix],
+                   d0=d["d0"].to_numpy()[ix], t12=d["t12"].to_numpy()[ix])
         if np.isfinite(d["t"].to_numpy()).any():
-            pass_rows[pid]["t"] = d["t"].to_numpy()[ix]
+            row["t"] = d["t"].to_numpy()[ix]
         if d["conc"].to_numpy().any():
-            pass_rows[pid]["conc"] = d["conc"].to_numpy()[ix]
+            row["conc"] = d["conc"].to_numpy()[ix]
+        pass_rows_all[pid] = row                                              # wszystkie przypisane wiersze (lambda, statystyki)
+        lane = ~r["wide"][order]                                              # pary: tylko wiersze pasa wlasnego (lane_fit = 'lane')
+        if lane.any():
+            pass_rows[pid] = {k: v[lane] for k, v in row.items()}
         speeds = d["speed"].to_numpy()[ix]
         rec = dict(pass_id=pid, file_id=rid, corridor_id=r["corridor"], date=rt.loc[rid, "date"],
                    v_med=float(np.nanmedian(speeds)) if np.isfinite(speeds).any() else None,
                    calib_interval=rt.loc[rid, "calib_interval"], calib_interval_uncertain=None,
                    data_tier=rt.loc[rid, "data_tier"], recorder_group=rt.loc[rid, "recorder_group"],
-                   n_points=int(len(ix)), s_start=float(s_ref.min()), s_end=float(s_ref.max()))
+                   n_points=int(len(ix)), s_start=float(s_ref.min()), s_end=float(s_ref.max()),
+                   wide_share=float(r["wide"].mean()))
         if do_align:
             dl = s_ref - r["s"]
             rec.update(align_ref=r["align_ref"], align_note=r.get("note"), n_blocks=r["n_blocks"], n_blocks_ok=r["n_ok"],
@@ -320,7 +329,7 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
                  {k: v for k, v in sec_cnt.items() if k != "n_sections" and v})
     lam_res = None
     if g.lambda_est.enabled:
-        lam_res = estimate_lambda_from_inputs(cfg, plate, stations, passes_df, pass_rows)
+        lam_res = estimate_lambda_from_inputs(cfg, plate, stations, passes_df, pass_rows_all)
         log.info("lambda d0 (estymator): %.5f (sigma_TSD %.4f z %d par; sigma_FWD %.4f z %d par)", lam_res["lambda_d0"],
                  lam_res["sigma_tsd"], lam_res["n_pairs_tsd"], lam_res["sigma_fwd"], lam_res["n_pairs_fwd"])
     cand = PA.build_candidates(plate, passes_df, pass_rows)
@@ -382,6 +391,7 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
 
     corr_tab = pd.DataFrame([dict(corridor_id=c.cid, length_m=c.length, x_start=c.x[0], y_start=c.y[0], x_end=c.x[-1], y_end=c.y[-1],
                                   n_pass=int((passes_df.corridor_id == c.cid).sum())) for c in corridors])
+    axis_info["n_dissolved"] = len(merges)
     meta = dict(axis=axis_info, align=align_info, n_runs=len(runs), n_stations=int(len(stations)), n_passes=int(len(passes_df)),
                 n_candidates=int(len(cand)), n_pairs=int(len(sel)), n_null_pairs=int(len(nulls_out)),
                 filters=dict(layers=g.layers, same_year_only=g.same_year_only, require_valid_d0=g.require_valid_d0,
@@ -392,7 +402,7 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
                 layers_count={k: int(v) for k, v in cand["layer"].value_counts().items()},
                 sections=dict(enabled=g.sections.enabled, **{k: int(v) for k, v in sec_cnt.items()},
                               pairs_in_section=int(cand["in_section"].sum()) if "in_section" in cand else 0),
-                note=("s_ref = %s, bez scalania duplikatow pasa; okno wartosci TSD wg s_ref "
+                note=("s_ref = %s; okno wartosci TSD wg s_ref "
                       "(+-%g m, >= %d wierszy z waznym d0). Polozenie TSD skorygowane o lag %+g m (jedna stala globalna)."
                       % (("s_ref_gps + delta (wyrownanie profilem)" if do_align else "s_ref_gps (bez wyrownania profilem)"),
                          g.window_m, g.min_rows, g.lag_m)))
@@ -404,6 +414,7 @@ def build_geometry_pairs(cfg: N4Config) -> dict:
     return dict(pairs=pairs, nulls=nulls_out, files=files, meta=meta, lambda_estimate=lam_res,
                 tables=dict(geo_pairs=cand, geo_fwd=plate, geo_passes=passes_df, geo_corridors=corr_tab,
                             geo_nulls=nulls_all, geo_sessions=sessions, geo_runs=fwd_runs, geo_sections=sec_tab, lambda_estimate=lam_tab,
-                            geo_align_blocks=pd.DataFrame(align_rows) if align_rows else None),
+                            geo_align_blocks=pd.DataFrame(align_rows) if align_rows else None,
+                            geo_merges=pd.DataFrame(merges) if merges else None),
                 section_report=(dict(sections=sec_tab, matches=sec_matches, runs=sec_runs, sessions=sec_sessions)
                                 if g.sections.enabled else None))

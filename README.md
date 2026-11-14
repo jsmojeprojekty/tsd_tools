@@ -3,7 +3,7 @@
 Pakiet `tsdfwd_tools` — narzedzia TSD/FWD dla Zakladu Diagnostyki Nawierzchni IBDiM (N1-N4), odtwarzajace metody
 raportu PW.S-1063 (Etap II). Projekt: `docs\PROJEKT.md`, inwentarz zrodel: `docs\INWENTARZ.md`, dziennik: `docs\DZIENNIK.md`.
 
-Stan: E2e — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N2 `layer_temp`, N3 `tsd_network` i N4 `tsd_fwd_compare` (tryby `pairs` i `geometry`) oraz instrukcje dla inzynierow. Tryb `geometry` wykrywa tez odcinki wspolne (Tab. 3.2) i zapisuje raport przegladu `section_review.html`. Opcjonalny estymator lambdy z powtorzen (`geometry.lambda_est`). Gdy wiersze TSD maja profil podluzny, przejazdy sa wyrownywane profilem (`geometry.align`). Nadal brak: scalania duplikatow pasa.
+Stan: E2f — N1 `fwd_tempcorr` (z opcjonalnym `fwd_fit`), N2 `layer_temp`, N3 `tsd_network` i N4 `tsd_fwd_compare` (tryby `pairs` i `geometry`) oraz instrukcje dla inzynierow. Tryb `geometry` wykrywa tez odcinki wspolne (Tab. 3.2) i zapisuje raport przegladu `section_review.html`. Opcjonalny estymator lambdy z powtorzen (`geometry.lambda_est`). Gdy wiersze TSD maja profil podluzny, przejazdy sa wyrownywane profilem (`geometry.align`). Os z przejazdow TSD ze scalaniem duplikatow pasa (`geometry.merge_lanes`). Nie ma drogomierza zakotwiczonego w strefach zlego GPS.
 
 ## Instrukcje dla inzynierow
 `docs\INSTRUKCJA_N1.md` (korekta temperaturowa FWD), `docs\INSTRUKCJA_N2.md` (temperatura warstwy), `docs\INSTRUKCJA_N3.md` (TSD na sieci + XML DSN),

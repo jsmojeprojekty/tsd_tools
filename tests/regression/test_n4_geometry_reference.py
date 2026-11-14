@@ -310,3 +310,44 @@ def test_profile_alignment_reproduces_tsd_sref(dbs, cid):
         ok = r.align_source.to_numpy(object) != "odometer_anchor"                 # drogomierz w strefach zlego GPS: poza zakresem
         assert np.nanmax(np.abs(sref - r.s_ref.to_numpy(float))[ok]) < 0.005
         assert (src[ok] == r.align_source.to_numpy(object)[ok]).all()
+
+
+def test_axis_with_lane_merging_reproduces_whole_reference_network(dbs):
+    """T-N4-18: os referencyjna zbudowana od zera z 239 plikow TSD (bez pliku wykluczonego qc_gps_shifted) = baza produktow: 165
+    korytarzy (te same numery i dlugosci), 43 scalenia duplikatow pasa (cel i liczba punktow), 6 956 291 wierszy (korytarz i `s_ref_gps`),
+    25 219 punktow `wide`."""
+    from tsdfwd_tools.compare import geo as G
+    prod, v4 = dbs["prod"], dbs["v4"]
+    excluded = {r[0] for r in v4.execute("SELECT DISTINCT file_id FROM tsd_gps_data_qc WHERE verdict_pair = 'PRZESUNIETY'")}
+    rows = pd.read_sql("SELECT file_id, tsd_id, chainage_m, latitude, longitude FROM tsd_measurements ORDER BY file_id, tsd_id", v4)
+    runs, ids = {}, {}
+    for f, g in rows.groupby("file_id", sort=True):
+        if f in excluded:
+            continue
+        runs[int(f)] = G.prepare_run(g.chainage_m.to_numpy(float), g.latitude.to_numpy(float), g.longitude.to_numpy(float))
+        ids[int(f)] = g.tsd_id.to_numpy()
+    del rows
+    corrs, assigned, info = G.build_axis(runs, merge=True)
+    ref_c = pd.read_sql("SELECT corridor_id, length_m FROM ref_corridors", prod).set_index("corridor_id")
+    assert sorted(c.cid for c in corrs) == sorted(ref_c.index) and len(corrs) == 165
+    assert max(abs(c.length - ref_c.length_m[c.cid]) for c in corrs) < 1e-3
+    rm = pd.read_sql("SELECT dissolved_id, target_id, n_points_wide, n_points_far FROM ref_corridor_merges", prod).set_index("dissolved_id")
+    mine = pd.DataFrame(info["merges"]).set_index("dissolved_id")
+    assert len(mine) == len(rm) == 43 and set(mine.index) == set(rm.index)
+    assert (mine.target_id == rm.target_id.reindex(mine.index)).all()
+    assert (mine.n_points_wide == rm.n_points_wide.reindex(mine.index)).all() and (mine.n_points_far == rm.n_points_far.reindex(mine.index)).all()
+    sref = pd.read_sql("SELECT tsd_id, corridor_id, s_ref_gps, lane_fit FROM tsd_sref", prod).set_index("tsd_id")
+    n = same = wide = wide_ref = wide_both = 0
+    ds_max = 0.0
+    for f, (cid, s, lat, _) in assigned.items():
+        r = sref.reindex(ids[f])
+        rc = r.corridor_id.fillna(-1).astype(int).to_numpy()
+        n += len(cid)
+        ok = cid == rc
+        same += int(ok.sum())
+        both = ok & (cid >= 0)
+        ds_max = max(ds_max, float(np.nanmax(np.abs(s[both] - r.s_ref_gps.to_numpy(float)[both]))) if both.any() else 0.0)
+        w, rw = info["wide"][f], (r.lane_fit == "wide").to_numpy()
+        wide, wide_ref, wide_both = wide + int(w.sum()), wide_ref + int(rw.sum()), wide_both + int((w & rw).sum())
+    assert n == same == 6956291 and ds_max < 0.001
+    assert wide == wide_ref == wide_both == 25219

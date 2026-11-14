@@ -178,6 +178,7 @@ class N4Geometry:
     require_valid_d0: bool = True                        # tylko pary z waznym d0 po obu stronach (okno >= min_rows wierszy)
     sections: N4Sections = field(default_factory=N4Sections)
     lambda_est: N4LambdaEst = field(default_factory=N4LambdaEst)
+    merge_lanes: bool = True                             # scalanie duplikatow pasa przy budowie osi z przejazdow TSD (gdy brak corridors_csv)
     align: str = "auto"                                  # wyrownanie przejazdow profilem: auto (gdy jest kolumna profilu) | true | false
     window_m: float = 5.0                                # polowka okna wartosci TSD (W5)
     min_rows: int = 3
