@@ -40,3 +40,18 @@ Integralnosc zrodel: po zakonczeniu audytu w `C:\projects\sql_tsd_fwd` ani `C:\W
 Praca zatrzymana po E0 zgodnie z promptem. Do decyzji (pelna lista: `docs\PROJEKT.md` sekcja 8):
 - Blokujace E1: Q-N1-1 (zestaw wspolczynnikow: e2a3 pelna precyzja vs Tab. 7.1), Q-N1-3 (regula zrzutu), Q-N1-5 (indeksy > 25 C), Q-N1-6 (czy potrzebne MDB w E1).
 - Blokujace kolejne etapy: Q-N4-1 (kanoniczne wartosci par zerowych), Q-N4-4 (zakres trybu `geometry`), Q-N3-2 (jak wypelnic pola D_* w XML), Q-N3-3 (definicja U_STD/SCI), Q-N2-1 (referencja H v2 vs C v2).
+
+## 2026-11-14 — E0 (uzupelnienie): przeglad katalogu `inne\`
+
+**Co zrobiono**
+- Przejrzano `inne\` (604 pliki, 238 MB): AUTC, TSDLayerIQ, autoresearch, gps_tsd, skrypty, soft_xgb, tsd_xgbr, tsdpath, xml (w tym generateDS i schematy DSN). Wyniki: `docs\INWENTARZ.md` sekcja 7. Nic w `inne\` nie zmieniono.
+- `inne\` dodano do `.gitignore` (238 MB, pliki binarne: `.exe`, `node.exe`, `.h5`, `.model`); skan wzorcow sekretow bez wynikow, `.env.example` z pustym kluczem.
+- Dopisano do `docs\PROJEKT.md` pytania Q-N3-10, Q-N3-11, Q-N1-7 i uzupelniono Q-N1-4.
+
+**Co sprawdzono**
+- `inne\xml\arch\dane_elem_tsd.xsd` + przyklad `G02_08280001_PP-U.xml` (TSD 2023-08-28): inny format XML (DSN wdsn 1.0.0, rekord z D0, D300, D0FWD, D300FWD...) niz `UC_*.xml` — 1720 rekordow, strumienie co 10 m.
+- `TSDLayerIQ\app\core\pipeline.py`: wyjasnia pochodzenie `T_XGB(120)`, `Tkor` (`D*(1+coef*(20-T))*5000/(0,981*Strain)`, coef 0,02/0,01), `*FWD` (`4,1497*D^0,7747`), `SCI300_FWD`, `BB_max = 1,24*D0`; struktura MDB (`Stations`, `Drops`, `History`).
+
+**Wplyw na projekt:** zadnych zmian w kodzie (E1 nie ruszono); do decyzji: Q-N3-10 (format docelowy XML), Q-N3-11 (nazwa modelu temperatury). Pozostale pytania z E0 bez zmian.
+
+**STOP — decyzja**: patrz E0 + Q-N3-10, Q-N3-11, Q-N1-7.

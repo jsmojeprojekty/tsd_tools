@@ -1,0 +1,7 @@
+inne/
+__pycache__/
+*.pyc
+.venv/
+.idea/
+.vscode/
+tests/local_paths.yaml
